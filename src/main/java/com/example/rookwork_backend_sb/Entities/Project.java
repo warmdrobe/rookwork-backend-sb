@@ -20,8 +20,9 @@ public class Project {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="access_modifier")
-    private String accessModifier;
+    // Project access modifier
+    @Column(name = "is_private")
+    private boolean isPrivate = true;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

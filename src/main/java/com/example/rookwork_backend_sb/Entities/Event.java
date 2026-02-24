@@ -1,7 +1,10 @@
 package com.example.rookwork_backend_sb.Entities;
 
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.*;
+import org.antlr.v4.runtime.misc.NotNull;
+
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.UUID;
@@ -18,6 +21,9 @@ public class Event {
     @Column(name="id", columnDefinition = "uuid")
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "event_name", nullable = false, length = 200)
+    private String eventName;
 
     @Column(name="event_description")
     private String eventDescription;

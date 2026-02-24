@@ -21,8 +21,8 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="task_title")
-    private String taskTitle;
+    @Column(name = "task_name",nullable = false, length = 200)
+    private String taskName;
 
     @Column(name="task_description")
     private String taskDescription;
