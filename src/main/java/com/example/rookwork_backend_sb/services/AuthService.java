@@ -1,8 +1,8 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.AuthRegister;
-import com.example.rookwork_backend_sb.Dtos.AuthResponse;
-import com.example.rookwork_backend_sb.Dtos.LoginRequest;
+import com.example.rookwork_backend_sb.Dtos.auth.AuthRegister;
+import com.example.rookwork_backend_sb.Dtos.auth.AuthResponse;
+import com.example.rookwork_backend_sb.Dtos.auth.LoginRequest;
 import com.example.rookwork_backend_sb.Entities.User;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.Base64;
 
 @Service
 @RequiredArgsConstructor

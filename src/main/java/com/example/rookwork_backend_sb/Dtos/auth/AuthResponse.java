@@ -1,4 +1,4 @@
-package com.example.rookwork_backend_sb.Dtos;
+package com.example.rookwork_backend_sb.Dtos.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
