@@ -1,8 +1,9 @@
 package com.example.rookwork_backend_sb.Entities;
 
-
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -21,15 +22,35 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="picture")
-    private String picture;
+    @Column(name="email", nullable = false)
+    private String email;
 
     @Column(name="profile_name")
     private String profileName;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+    @Column(name="picture")
+    private String picture;
+
+    @Column(name="password_hash")
+    private String passwordHash;
+
+    @Column(name="is_active")
+    private boolean isActive;
+
+    @Column(name="is_verified")
+    private boolean isVerified;
+
+    @Column(name = "refresh_token_hash")
+    private String refreshTokenHash;
+
+    @Column(name="refresh_token_expires_at")
+    private LocalDateTime refreshTokenExpiresAt;
+
+    @Column(name="created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name="updated_at")
+    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();
@@ -42,5 +63,4 @@ public class User {
 
     @OneToMany(mappedBy = "user")
     private Set<Event> events = new HashSet<>();
-
 }
