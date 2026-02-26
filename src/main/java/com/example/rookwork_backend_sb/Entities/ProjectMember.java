@@ -27,7 +27,8 @@ public class ProjectMember {
     private Project project;
 
     @Column(name="role")
-    private String role;
+    @Enumerated(EnumType.STRING)
+    private ProjectRole role;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

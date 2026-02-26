@@ -6,6 +6,8 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.UUID;
 
@@ -15,11 +17,15 @@ public class JwtService {
 
     private final JwtConfig jwtConfig;
 
+    private SecretKey getSignKey() {
+        return Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8));
+    }
+
     public String generateToken(UUID userId) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15))
+                .expiration(new Date(System.currentTimeMillis() + jwtConfig.getExpiration()))
                 .signWith(getSignKey())
                 .compact();
     }
@@ -33,7 +39,6 @@ public class JwtService {
                 .getSubject();
     }
 
-    // refresh token
     public String generateRefreshToken() {
         return UUID.randomUUID().toString();
     }
