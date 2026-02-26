@@ -15,23 +15,21 @@ public class JwtService {
 
     private final JwtConfig jwtConfig;
 
-    public String generateToken(String username) {
+    public String generateToken(UUID userId) {
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(
-                        new Date(System.currentTimeMillis() + jwtConfig.getExpiration())
-                )
-                .signWith(Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes()))
+                .subject(userId.toString())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15))
+                .signWith(getSignKey())
                 .compact();
     }
 
-    public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(jwtConfig.getSecret().getBytes())
+    public String extractUserId(String token) {
+        return Jwts.parser()
+                .verifyWith(getSignKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody()
+                .parseSignedClaims(token)
+                .getPayload()
                 .getSubject();
     }
 

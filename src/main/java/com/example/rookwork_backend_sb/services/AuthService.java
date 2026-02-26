@@ -40,7 +40,6 @@ public class AuthService {
 
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
         return generateTokens(user);
     }
 
@@ -95,13 +94,11 @@ public class AuthService {
     }
 
     private AuthResponse generateTokens(User user) {
-        String accessToken = jwtService.generateToken(user.getEmail());
+        String accessToken = jwtService.generateToken(user.getId());
         String refreshToken = jwtService.generateRefreshToken();
-
         user.setRefreshTokenHash(hashToken(refreshToken));
         user.setRefreshTokenExpiresAt(LocalDateTime.now().plusDays(7));
         userRepository.save(user);
-
         return new AuthResponse(accessToken, refreshToken);
     }
 
