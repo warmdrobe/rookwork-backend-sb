@@ -13,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(name="subtasks")
 public class SubTask {
+
     @Id
     @Column(name="id", columnDefinition = "uuid")
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -33,10 +34,7 @@ public class SubTask {
     @Column(name="updated_at")
     private LocalDateTime updatedAt;
 
-
-    //A Subtask belongs to a task
-    @ManyToOne
-    @JoinColumn(name="task_id", nullable = false)
-    private Task task;
-
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_id", nullable = false)
+    private Issue issue;
 }

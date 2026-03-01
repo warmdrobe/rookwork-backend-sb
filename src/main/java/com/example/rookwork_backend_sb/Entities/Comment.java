@@ -15,6 +15,7 @@ import java.util.UUID;
 @Entity
 @Table(name="comments")
 public class Comment {
+
     @Id
     @Column(name="id", columnDefinition = "uuid")
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,11 +24,9 @@ public class Comment {
     @Column(name="content", nullable = false)
     private String content;
 
-    @Column(name="work_item_type", nullable = false)//not NULL, -- story, task,subtask
-    private String workItemType;
-
-    @Column(name="work_item_id", nullable = false)//
-    private UUID workItemId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_id", nullable = false)
+    private Issue issue;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -35,20 +34,15 @@ public class Comment {
     @Column(name="updated_at")
     private LocalDateTime updatedAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="user_id", nullable = false)
     private User user;
 
-    // Self-referencing: Many comments can have one parent
+    // Self-referencing (reply system)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
-    // One comment can have many replies
-    @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Comment> replies = new HashSet<>();
-
-
-
-
 }
