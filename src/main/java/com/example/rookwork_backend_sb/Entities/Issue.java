@@ -18,12 +18,12 @@ import java.util.UUID;
 public class Issue {
 
     @Id
-    @GeneratedValue
-    @Column(columnDefinition = "uuid")
+    @Column(name="id", columnDefinition = "uuid")
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(length = 200, nullable = false)
-    private String title;
+    @Column(name="issue_name",length = 200, nullable = false)
+    private String issueName;
 
     @Column(columnDefinition = "text")
     private String description;
@@ -32,6 +32,13 @@ public class Issue {
     @Column(name = "issue_type", length = 20, nullable = false)
     private IssueType issueType; // EPIC, STORY, TASK
 
+    @Column(name="priority")
+    @Enumerated(EnumType.STRING)
+    private PriorityType priority;
+
+    @Column(name="status")
+    @Enumerated(EnumType.STRING)
+    private Status status;
     // Self reference (parent issue)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
