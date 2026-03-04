@@ -1,5 +1,4 @@
 package com.example.rookwork_backend_sb.Entities;
-
 import jakarta.persistence.*;
 import lombok.*;
 
