@@ -1,14 +1,12 @@
 package com.example.rookwork_backend_sb.Entities;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Builder
 @Getter
 @Setter
 @AllArgsConstructor
@@ -39,6 +37,9 @@ public class Activity {
     @Column(name = "entity_type", nullable = false)
     private ActivityEntityType entityType;
     // 'issue', 'comment', 'file', 'subtask', 'member'
+
+    @Column(name = "entity_id", nullable = false, columnDefinition = "uuid")
+    private UUID entityId;
 
     @Column(name = "entity_name")
     private String entityName;
