@@ -12,5 +12,4 @@ public class UpdateIssueRequest {
     public String status;
     public String parentId;
     public LocalDate deadline;
-
 }
