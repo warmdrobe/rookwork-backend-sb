@@ -10,8 +10,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Service
@@ -242,6 +244,52 @@ public class IssueService {
 
         return getIssueResponse(projectId, issue);
     }
+    public void deleteIssue(UUID projectId,UUID issueId) {
+        UUID currentUserId= securityUtil.getCurrentUserId();
+        ProjectMember member= projectMemberRepository
+                .findById(new ProjectMemberId(currentUserId,projectId))
+                .orElseThrow(()-> new RuntimeException("Not a member of project"));
+        if(member.getRole()!= ProjectRole.OWNER){
+            throw new RuntimeException("Only owner can delete issue");
+
+        }
+        issueRepository.deleteById(issueId);
+    }
+    public List<IssueResponse> getAllIssue(UUID projectId) {
+        UUID currentUserId= securityUtil.getCurrentUserId();
+        ProjectMember member= projectMemberRepository
+                .findById(new ProjectMemberId(currentUserId,projectId))
+                .orElseThrow(()-> new RuntimeException("Not a member of project"));
+        return issueRepository.findAllByProjectId(projectId)
+                .stream()
+                .map(issue -> IssueResponse.builder()
+                        .id(issue.getId())
+                        .issueName(issue.getIssueName())
+                        .issueType(issue.getIssueType())
+                        .priority(issue.getPriority())
+                        .status(issue.getStatus())
+                        .deadline(issue.getDeadline())
+                        .build())
+                .collect(Collectors.toList());
+
+    }
+    public List<IssueResponse> getAllByAssignedTo_Id() {
+        UUID currentUserId= securityUtil.getCurrentUserId();
+        return issueRepository.findAllByAssignedTo_Id(currentUserId)
+                .stream()
+                .map(issue -> IssueResponse.builder()
+                        .id(issue.getId())
+                        .issueName(issue.getIssueName())
+                        .description(issue.getDescription())
+                        .issueType(issue.getIssueType())
+                        .priority(issue.getPriority())
+                        .status(issue.getStatus())
+                        .deadline(issue.getDeadline())
+                        .build())
+                .collect(Collectors.toList());
+
+    }
+
 
     private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();

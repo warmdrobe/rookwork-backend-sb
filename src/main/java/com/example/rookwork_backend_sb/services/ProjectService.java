@@ -12,8 +12,11 @@ import com.example.rookwork_backend_sb.security.SecurityUtil;
 import org.springframework.stereotype.Service;
 import lombok.AllArgsConstructor;
 
+import java.awt.*;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Service
@@ -106,6 +109,15 @@ public class ProjectService {
         }
 
         projectRepository.deleteById(projectId);
+    }
+    public List<ProjectResponse> getAllProject(UUID userId) {
+        return projectMemberRepository.findAllByUserId(userId)
+                .stream()
+                .map(member -> ProjectResponse.builder()
+                        .id(member.getProject().getId())
+                        .projectName(member.getProject().getProjectName())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     //invite into project

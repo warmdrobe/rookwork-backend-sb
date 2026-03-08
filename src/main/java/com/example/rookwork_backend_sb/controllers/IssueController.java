@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -32,5 +33,23 @@ public class IssueController {
         return ResponseEntity.ok(
                 issueService.updateIssue(projectId, issueId, request)
         );
+    }
+    @DeleteMapping("/{projectId}/{issueId}")
+    public ResponseEntity<Void> deleteIssue(
+            @PathVariable UUID projectId,
+            @PathVariable UUID issueId
+    ){
+            issueService.deleteIssue(projectId, issueId);
+            return ResponseEntity.ok().build();
+    }
+    @GetMapping("/assigned")
+    public ResponseEntity<List<IssueResponse>> getAllIssuesByAssignedTo_Id(){
+        return ResponseEntity.ok(issueService.getAllByAssignedTo_Id());
+    }
+    @GetMapping("/{projectId}")
+    public ResponseEntity<List<IssueResponse>> getAllIssues(
+            @PathVariable UUID projectId
+    ){
+        return ResponseEntity.ok(issueService.getAllIssue(projectId));
     }
 }
