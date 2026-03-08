@@ -1,7 +1,9 @@
 package com.example.rookwork_backend_sb.Entities;
 
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -44,6 +46,7 @@ public class Activity {
     @Column(name = "entity_name")
     private String entityName;
 
+    @Type(JsonBinaryType.class)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata; // lưu JSON string, parse ở service layer
 
