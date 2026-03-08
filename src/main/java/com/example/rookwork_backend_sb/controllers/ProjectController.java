@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.UUID;
+
 @AllArgsConstructor
 @RestController
 @RequestMapping("api/projects")
@@ -19,5 +22,9 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(@RequestBody CreateProjectRequest request){
         return ResponseEntity.ok(service.createProject(request));
+    }
+    @GetMapping("/{userId}")
+    public ResponseEntity<List<ProjectResponse>> getAllProject(@PathVariable UUID userId) {
+        return ResponseEntity.ok(service.getAllProject(userId));
     }
 }
