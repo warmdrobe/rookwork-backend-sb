@@ -1,18 +1,16 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.issues.CreateIssueRequest;
-import com.example.rookwork_backend_sb.Dtos.issues.IssueResponse;
+import com.example.rookwork_backend_sb.Dtos.issues.*;
 import com.example.rookwork_backend_sb.Entities.*;
-import com.example.rookwork_backend_sb.repositories.IssueRepository;
-import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
-import com.example.rookwork_backend_sb.repositories.ProjectRepository;
-import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -24,26 +22,23 @@ public class IssueService {
     private final ProjectRepository projectRepository;
     private final ActivityService activityService;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationRepository notificationRepository;
 
     @Transactional
     public IssueResponse createIssue(UUID projectId, CreateIssueRequest request) {
-        //Check user
         UUID currentUserId = securityUtil.getCurrentUserId();
-
 
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check membership
         projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new RuntimeException("Not a member of this project"));
 
-        // Get project
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
-        // Create issue
         Issue issue = Issue.builder()
                 .issueName(request.getIssueName())
                 .description(request.getDescription())
@@ -59,16 +54,196 @@ public class IssueService {
         issueRepository.save(issue);
 
         activityService.log(
-            issue.getProject(),
-            currentUser,
-            ActivityAction.CREATED,
-            ActivityEntityType.ISSUE,
-            issue.getId(),
-            issue.getIssueName(),
-            null
+                issue.getProject(),
+                currentUser,
+                ActivityAction.CREATED,
+                ActivityEntityType.ISSUE,
+                issue.getId(),
+                issue.getIssueName(),
+                null
         );
 
-        // Map response
+        return getIssueResponse(projectId, issue);
+    }
+
+    @Transactional
+    public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
+        UUID currentUserId = securityUtil.getCurrentUserId();
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        projectMemberRepository.findById(new ProjectMemberId(currentUserId, projectId))
+                .orElseThrow(() -> new RuntimeException("Not a member in project"));
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new RuntimeException("Issue not found"));
+
+        // Track trước khi update
+        Status oldStatus = issue.getStatus();
+        UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
+
+        // Apply patch
+        if (request.getIssueName() != null) {
+            issue.setIssueName(request.getIssueName());
+        }
+
+        if (request.getDescription() != null) {
+            issue.setDescription(request.getDescription());
+        }
+
+        if (request.getPriority() != null) {
+            issue.setPriority(request.getPriority());
+        }
+
+        if (request.getDeadline() != null) {
+            issue.setDeadline(request.getDeadline().atStartOfDay());
+        }
+
+        if (request.getParentId() != null) {
+            Issue parent = issueRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new RuntimeException("Parent issue not found"));
+            if (parent.getId().equals(issue.getId())) {
+                throw new RuntimeException("Issue cannot be its own parent");
+            }
+            issue.setParent(parent);
+        }
+
+        if (request.getAssignedToId() != null) {
+            User assignee = userRepository.findById(request.getAssignedToId())
+                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+            issue.setAssignedTo(assignee);
+        }
+
+        if (request.getStatus() != null) {
+            issue.setStatus(request.getStatus());
+        }
+
+        issue.setUpdatedAt(LocalDateTime.now());
+        issueRepository.save(issue);
+
+        // Log + notify khi assign thay đổi
+        if (request.getAssignedToId() != null && !request.getAssignedToId().equals(oldAssigneeId)) {
+            User assignee = issue.getAssignedTo();
+
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.ASSIGNED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    String.format("{\"assigned_to_id\":\"%s\",\"assigned_to_name\":\"%s\"}",
+                            assignee.getId(),
+                            assignee.getProfileName())
+            );
+
+            Notification notification = Notification.builder()
+                    .user(assignee)
+                    .issue(issue)
+                    .title("You have been assigned to an issue")
+                    .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
+                            currentUser.getProfileName(),
+                            issue.getIssueName(),
+                            project.getProjectName()))
+                    .isRead(false)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            notificationRepository.save(notification);
+
+            messagingTemplate.convertAndSendToUser(
+                    assignee.getId().toString(),
+                    "/queue/notifications",
+                    Map.of(
+                            "type", "ASSIGNED",
+                            "notificationId", notification.getId(),
+                            "issueId", issue.getId(),
+                            "issueName", issue.getIssueName(),
+                            "projectName", project.getProjectName(),
+                            "assignedBy", currentUser.getProfileName()
+                    )
+            );
+        }
+
+        // Log status changed
+        if (request.getStatus() != null && request.getStatus() != oldStatus) {
+            if (request.getStatus() == Status.DONE) {
+                activityService.log(
+                        project, currentUser,
+                        ActivityAction.COMPLETED,
+                        ActivityEntityType.ISSUE,
+                        issue.getId(),
+                        issue.getIssueName(),
+                        null
+                );
+            } else {
+                activityService.log(
+                        project, currentUser,
+                        ActivityAction.MOVED,
+                        ActivityEntityType.ISSUE,
+                        issue.getId(),
+                        issue.getIssueName(),
+                        String.format("{\"from\":\"%s\",\"to\":\"%s\"}", oldStatus, request.getStatus())
+                );
+            }
+        }
+
+        // Log priority changed
+        if (request.getPriority() != null) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    String.format("{\"field\":\"priority\",\"to\":\"%s\"}", request.getPriority())
+            );
+        }
+
+        // Log name changed
+        if (request.getIssueName() != null) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    String.format("{\"field\":\"name\",\"to\":\"%s\"}", request.getIssueName())
+            );
+        }
+
+        // Log description changed
+        if (request.getDescription() != null) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    String.format("{\"field\":\"description\",\"to\":\"%s\"}", request.getDescription())
+            );
+        }
+
+        // Log deadline changed
+        if (request.getDeadline() != null) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    String.format("{\"field\":\"deadline\",\"to\":\"%s\"}", request.getDeadline())
+            );
+        }
+
+        return getIssueResponse(projectId, issue);
+    }
+
+    private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();
         response.setId(issue.getId());
         response.setIssueName(issue.getIssueName());
@@ -76,11 +251,19 @@ public class IssueService {
         response.setIssueType(issue.getIssueType());
         response.setPriority(issue.getPriority());
         response.setStatus(issue.getStatus());
-        response.setParentId(issue.getParent().getId());
+        response.setParentId(issue.getParent() != null ? issue.getParent().getId() : null);
         response.setProjectId(projectId);
         response.setDeadline(issue.getDeadline());
         response.setCreatedAt(issue.getCreatedAt());
         response.setUpdatedAt(issue.getUpdatedAt());
+
+        if (issue.getAssignedTo() != null) {
+            AssigneeResponse assignee = new AssigneeResponse();
+            assignee.setId(issue.getAssignedTo().getId());
+            assignee.setProfileName(issue.getAssignedTo().getProfileName());
+            assignee.setPicture(issue.getAssignedTo().getPicture());
+            response.setAssignedTo(assignee);
+        }
 
         return response;
     }
