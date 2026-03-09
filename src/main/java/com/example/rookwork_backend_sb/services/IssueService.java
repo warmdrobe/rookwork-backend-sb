@@ -6,15 +6,17 @@ import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+@Slf4j
 @AllArgsConstructor
 @Service
 public class IssueService {
@@ -27,6 +29,7 @@ public class IssueService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
 
+    // create issue
     @Transactional
     public IssueResponse createIssue(UUID projectId, CreateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
@@ -68,7 +71,6 @@ public class IssueService {
         return getIssueResponse(projectId, issue);
     }
 
-    @Transactional
     public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -84,11 +86,9 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new RuntimeException("Issue not found"));
 
-        // Track trước khi update
         Status oldStatus = issue.getStatus();
         UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
 
-        // Apply patch
         if (request.getIssueName() != null) {
             issue.setIssueName(request.getIssueName());
         }
@@ -126,6 +126,13 @@ public class IssueService {
 
         issue.setUpdatedAt(LocalDateTime.now());
         issueRepository.save(issue);
+
+        // Broadcast issue update tới tất cả member đang xem project (để test WS + real-time UI)
+        String dest = "/topic/project/" + projectId + "/issues";
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "ISSUE_UPDATED");
+        payload.put("issue", getIssueResponse(projectId, issue));
+        messagingTemplate.convertAndSend(dest, (Object) payload);
 
         // Log + notify khi assign thay đổi
         if (request.getAssignedToId() != null && !request.getAssignedToId().equals(oldAssigneeId)) {
@@ -244,6 +251,8 @@ public class IssueService {
 
         return getIssueResponse(projectId, issue);
     }
+
+    //delete
     public void deleteIssue(UUID projectId,UUID issueId) {
         UUID currentUserId= securityUtil.getCurrentUserId();
         ProjectMember member= projectMemberRepository
@@ -255,6 +264,8 @@ public class IssueService {
         }
         issueRepository.deleteById(issueId);
     }
+
+    // get all
     public List<IssueResponse> getAllIssue(UUID projectId) {
         UUID currentUserId= securityUtil.getCurrentUserId();
         ProjectMember member= projectMemberRepository
@@ -271,8 +282,9 @@ public class IssueService {
                         .deadline(issue.getDeadline())
                         .build())
                 .collect(Collectors.toList());
-
     }
+
+    // get by user id
     public List<IssueResponse> getAllByAssignedTo_Id() {
         UUID currentUserId= securityUtil.getCurrentUserId();
         return issueRepository.findAllByAssignedTo_Id(currentUserId)
@@ -287,10 +299,9 @@ public class IssueService {
                         .deadline(issue.getDeadline())
                         .build())
                 .collect(Collectors.toList());
-
     }
 
-
+    // issue mapping
     private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();
         response.setId(issue.getId());
