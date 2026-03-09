@@ -119,6 +119,4 @@ public class ProjectService {
                         .build())
                 .collect(Collectors.toList());
     }
-
-    //invite into project
 }

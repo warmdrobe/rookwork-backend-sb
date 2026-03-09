@@ -34,6 +34,7 @@ public class IssueController {
                 issueService.updateIssue(projectId, issueId, request)
         );
     }
+
     @DeleteMapping("/{projectId}/{issueId}")
     public ResponseEntity<Void> deleteIssue(
             @PathVariable UUID projectId,
@@ -42,10 +43,14 @@ public class IssueController {
             issueService.deleteIssue(projectId, issueId);
             return ResponseEntity.ok().build();
     }
+
+    // all
     @GetMapping("/assigned")
     public ResponseEntity<List<IssueResponse>> getAllIssuesByAssignedTo_Id(){
         return ResponseEntity.ok(issueService.getAllByAssignedTo_Id());
     }
+
+    // all issues of project
     @GetMapping("/{projectId}")
     public ResponseEntity<List<IssueResponse>> getAllIssues(
             @PathVariable UUID projectId
