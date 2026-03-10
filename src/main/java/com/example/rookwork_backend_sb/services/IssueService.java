@@ -1,7 +1,11 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.issues.*;
-import com.example.rookwork_backend_sb.Entities.*;
+import com.example.rookwork_backend_sb.dtos.issues.*;
+import com.example.rookwork_backend_sb.entities.*;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
@@ -16,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-@Slf4j
 @AllArgsConstructor
 @Service
 public class IssueService {
@@ -35,14 +38,14 @@ public class IssueService {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
         User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
         projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new RuntimeException("Not a member of this project"));
+                .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         Issue issue = Issue.builder()
                 .issueName(request.getIssueName())
@@ -71,20 +74,21 @@ public class IssueService {
         return getIssueResponse(projectId, issue);
     }
 
+    // update issue
     public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
         User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
         projectMemberRepository.findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new RuntimeException("Not a member in project"));
+                .orElseThrow(() -> new ForbiddenException("Not a member in project"));
 
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         Issue issue = issueRepository.findById(issueId)
-                .orElseThrow(() -> new RuntimeException("Issue not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
         Status oldStatus = issue.getStatus();
         UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
@@ -107,16 +111,16 @@ public class IssueService {
 
         if (request.getParentId() != null) {
             Issue parent = issueRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new RuntimeException("Parent issue not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent issue not found"));
             if (parent.getId().equals(issue.getId())) {
-                throw new RuntimeException("Issue cannot be its own parent");
+                throw new BadRequestException("Issue cannot be its own parent");
             }
             issue.setParent(parent);
         }
 
         if (request.getAssignedToId() != null) {
             User assignee = userRepository.findById(request.getAssignedToId())
-                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
             issue.setAssignedTo(assignee);
         }
 
@@ -257,10 +261,9 @@ public class IssueService {
         UUID currentUserId= securityUtil.getCurrentUserId();
         ProjectMember member= projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId,projectId))
-                .orElseThrow(()-> new RuntimeException("Not a member of project"));
+                .orElseThrow(()-> new ForbiddenException("Not a member of project"));
         if(member.getRole()!= ProjectRole.OWNER){
-            throw new RuntimeException("Only owner can delete issue");
-
+            throw new ForbiddenException("Only OWNER can delete issue");
         }
         issueRepository.deleteById(issueId);
     }
@@ -270,7 +273,7 @@ public class IssueService {
         UUID currentUserId= securityUtil.getCurrentUserId();
         ProjectMember member= projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId,projectId))
-                .orElseThrow(()-> new RuntimeException("Not a member of project"));
+                .orElseThrow(()-> new ForbiddenException("Not a member of project"));
         return issueRepository.findAllByProjectId(projectId)
                 .stream()
                 .map(issue -> IssueResponse.builder()

@@ -1,11 +1,16 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.auth.AuthRegister;
-import com.example.rookwork_backend_sb.Dtos.auth.AuthResponse;
-import com.example.rookwork_backend_sb.Dtos.auth.LoginRequest;
-import com.example.rookwork_backend_sb.Entities.User;
+import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
+import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
+import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.AppException;
+import com.example.rookwork_backend_sb.exceptions.ConflictException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -35,17 +40,17 @@ public class AuthService {
                     )
             );
         } catch (BadCredentialsException e) {
-            throw new RuntimeException("Invalid email or password");
+            throw new UnauthorizedException("Invalid email or password");
         }
 
         User user = userRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return generateTokens(user);
     }
 
     public AuthResponse register(AuthRegister dto) {
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already in use");
+            throw new ConflictException("Email already in use");
         }
 
         User user = User.builder()
@@ -66,10 +71,10 @@ public class AuthService {
     public AuthResponse refresh(String refreshToken) {
         User user = userRepository.findByRefreshTokenHash(
                         hashToken(refreshToken))
-                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
         if (user.getRefreshTokenExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Refresh token expired");
+            throw new UnauthorizedException("Refresh token expired");
         }
 
         return generateTokens(user);
@@ -89,7 +94,7 @@ public class AuthService {
             String result = hexString.toString();
             return result;
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Error hashing token");
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR,"Error hashing token");
         }
     }
 
@@ -101,5 +106,4 @@ public class AuthService {
         userRepository.save(user);
         return new AuthResponse(accessToken, refreshToken);
     }
-
 }

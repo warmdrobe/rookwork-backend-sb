@@ -1,10 +1,9 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.notifications.NotificationResponse;
+import com.example.rookwork_backend_sb.dtos.notifications.NotificationResponse;
 import com.example.rookwork_backend_sb.repositories.*;
 import lombok.AllArgsConstructor;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
-import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,13 +14,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Service
 public class NotificationService {
-    private final IssueRepository issueRepository;
     private final SecurityUtil securityUtil;
-    private final ProjectMemberRepository projectMemberRepository;
-    private final ProjectRepository projectRepository;
-    private final ActivityService activityService;
-    private final UserRepository userRepository;
-    private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
 
     public List<NotificationResponse> getAll() {

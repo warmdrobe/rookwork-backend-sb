@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Entities.*;
+import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.repositories.ActivityRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.PageRequest;

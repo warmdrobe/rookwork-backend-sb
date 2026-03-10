@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.controllers;
 
-import com.example.rookwork_backend_sb.Dtos.notifications.NotificationResponse;
+import com.example.rookwork_backend_sb.dtos.notifications.NotificationResponse;
 import com.example.rookwork_backend_sb.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

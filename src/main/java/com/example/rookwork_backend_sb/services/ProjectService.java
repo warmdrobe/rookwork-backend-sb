@@ -1,9 +1,12 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.projects.CreateProjectRequest;
-import com.example.rookwork_backend_sb.Dtos.projects.ProjectResponse;
-import com.example.rookwork_backend_sb.Dtos.projects.UpdateProjectRequest;
-import com.example.rookwork_backend_sb.Entities.*;
+import com.example.rookwork_backend_sb.dtos.projects.CreateProjectRequest;
+import com.example.rookwork_backend_sb.dtos.projects.ProjectResponse;
+import com.example.rookwork_backend_sb.dtos.projects.UpdateProjectRequest;
+import com.example.rookwork_backend_sb.entities.*;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
@@ -12,7 +15,6 @@ import com.example.rookwork_backend_sb.security.SecurityUtil;
 import org.springframework.stereotype.Service;
 import lombok.AllArgsConstructor;
 
-import java.awt.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -30,10 +32,10 @@ public class ProjectService {
     public ProjectResponse createProject(CreateProjectRequest request){
         UUID currentUserId = securityUtil.getCurrentUserId();
         if(currentUserId == null)
-            throw new RuntimeException("Authenticated");
+            throw new UnauthorizedException("Not authenticated");
 
         User user = userRepository.findById(currentUserId)
-                .orElseThrow(()->new RuntimeException("User not found"));
+                .orElseThrow(()->new ResourceNotFoundException("User not found"));
         Project project = Project.builder()
                 .projectName(request.projectName)
                 .isPrivate(true)
@@ -69,10 +71,10 @@ public class ProjectService {
 
         ProjectMember member = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new RuntimeException("Not a member of this project"));
+                .orElseThrow(() -> new ResourceNotFoundException("Not a member of this project"));
 
         if (member.getRole() != ProjectRole.OWNER) {
-            throw new RuntimeException("Only OWNER can update project");
+            throw new ForbiddenException("Only OWNER can update project");
         }
 
         Project project = member.getProject();
@@ -102,10 +104,10 @@ public class ProjectService {
         UUID currentUserId = securityUtil.getCurrentUserId();
         ProjectMember member = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new RuntimeException("Not a member of project"));
+                .orElseThrow(() -> new ResourceNotFoundException("Not a member of project"));
 
         if(member.getRole() != ProjectRole.OWNER){
-            throw new RuntimeException("Only on can delete this project");
+            throw new ForbiddenException("Only OWNER can delete this project");
         }
 
         projectRepository.deleteById(projectId);

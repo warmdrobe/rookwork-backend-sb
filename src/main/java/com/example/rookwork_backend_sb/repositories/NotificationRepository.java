@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.repositories;
 
-import com.example.rookwork_backend_sb.Entities.Notification;
+import com.example.rookwork_backend_sb.entities.Notification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
