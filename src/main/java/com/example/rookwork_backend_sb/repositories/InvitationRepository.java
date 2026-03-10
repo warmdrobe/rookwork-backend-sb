@@ -1,7 +1,7 @@
 package com.example.rookwork_backend_sb.repositories;
 
-import com.example.rookwork_backend_sb.Entities.Invitation;
-import com.example.rookwork_backend_sb.Entities.InvitationStatus;
+import com.example.rookwork_backend_sb.entities.Invitation;
+import com.example.rookwork_backend_sb.entities.InvitationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.controllers;
 
-import com.example.rookwork_backend_sb.Dtos.invitations.SendInviteRequest;
+import com.example.rookwork_backend_sb.dtos.invitations.SendInviteRequest;
 import com.example.rookwork_backend_sb.services.InvitationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

@@ -1,7 +1,10 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.Dtos.invitations.InvitationResponse;
-import com.example.rookwork_backend_sb.Entities.*;
+import com.example.rookwork_backend_sb.dtos.invitations.InvitationResponse;
+import com.example.rookwork_backend_sb.entities.*;
+import com.example.rookwork_backend_sb.exceptions.ConflictException;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.repositories.InvitationRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectRepository;
@@ -33,30 +36,30 @@ public class InvitationService {
         // Kiểm tra người gửi có phải OWNER không
         ProjectMember sender = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new RuntimeException("Not a member of this project"));
+                .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
         if (sender.getRole() != ProjectRole.OWNER) {
-            throw new RuntimeException("Only OWNER can invite members");
+            throw new ForbiddenException("Only OWNER can invite members");
         }
 
         // Tìm user được invite
         User invitedUser = userRepository.findByEmail(invitedEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Kiểm tra đã là member chưa
         if (projectMemberRepository.findById(
                 new ProjectMemberId(invitedUser.getId(), projectId)).isPresent()) {
-            throw new RuntimeException("User is already a member");
+            throw new ConflictException("User is already a member");
         }
 
         // Kiểm tra đã có invite pending chưa
         if (invitationRepository.findByProject_IdAndInvitedUser_Id(
                 projectId, invitedUser.getId()).isPresent()) {
-            throw new RuntimeException("Invitation already sent");
+            throw new ConflictException("Invitation already sent");
         }
 
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         Invitation invitation = Invitation.builder()
                 .project(project)
@@ -86,14 +89,14 @@ public class InvitationService {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
         Invitation invitation = invitationRepository.findById(invitationId)
-                .orElseThrow(() -> new RuntimeException("Invitation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
         if (!invitation.getInvitedUser().getId().equals(currentUserId)) {
-            throw new RuntimeException("Not your invitation");
+            throw new ForbiddenException("Not your invitation");
         }
 
         if (invitation.getStatus() != InvitationStatus.PENDING) {
-            throw new RuntimeException("Invitation already responded");
+            throw new ConflictException("Invitation already responded");
         }
 
         if (accept) {

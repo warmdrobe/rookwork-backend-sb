@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.repositories;
 
-import com.example.rookwork_backend_sb.Entities.Issue;
+import com.example.rookwork_backend_sb.entities.Issue;
 
 import java.util.List;
 import java.util.Optional;

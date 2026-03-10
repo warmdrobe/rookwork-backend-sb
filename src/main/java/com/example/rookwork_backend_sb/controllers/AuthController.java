@@ -1,12 +1,11 @@
 package com.example.rookwork_backend_sb.controllers;
 
-import com.example.rookwork_backend_sb.Dtos.auth.AuthRegister;
-import com.example.rookwork_backend_sb.Dtos.auth.AuthResponse;
-import com.example.rookwork_backend_sb.Dtos.auth.LoginRequest;
-import com.example.rookwork_backend_sb.Dtos.auth.RefreshRequest;
+import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
+import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
+import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.dtos.auth.RefreshRequest;
 import com.example.rookwork_backend_sb.services.AuthService;
 import com.example.rookwork_backend_sb.services.JwtService;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;

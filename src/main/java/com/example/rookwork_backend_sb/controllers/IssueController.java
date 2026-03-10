@@ -1,13 +1,11 @@
 package com.example.rookwork_backend_sb.controllers;
 
-import com.example.rookwork_backend_sb.Dtos.issues.CreateIssueRequest;
-import com.example.rookwork_backend_sb.Dtos.issues.IssueResponse;
-import com.example.rookwork_backend_sb.Dtos.issues.UpdateIssueRequest;
-import com.example.rookwork_backend_sb.Entities.Issue;
+import com.example.rookwork_backend_sb.dtos.issues.CreateIssueRequest;
+import com.example.rookwork_backend_sb.dtos.issues.IssueResponse;
+import com.example.rookwork_backend_sb.dtos.issues.UpdateIssueRequest;
 import com.example.rookwork_backend_sb.services.IssueService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

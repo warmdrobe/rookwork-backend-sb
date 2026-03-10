@@ -19,7 +19,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String identifier)
             throws UsernameNotFoundException {
 
-        com.example.rookwork_backend_sb.Entities.User user;
+        com.example.rookwork_backend_sb.entities.User user;
 
         // Nếu là email (login)
         if (identifier.contains("@")) {
