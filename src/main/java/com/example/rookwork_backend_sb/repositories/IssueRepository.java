@@ -13,5 +13,5 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
     Optional<Issue> findById(UUID id);
     List<Issue> findAllByProjectId(UUID projectId);
     List<Issue> findAllByAssignedToId(UUID userId);
-
+    Optional<Issue> findByIdAndProjectId(UUID id, UUID projectId);
 }
