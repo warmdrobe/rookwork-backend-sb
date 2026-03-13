@@ -28,7 +28,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SecurityUtil securityUtil;
 
-    //Create project
+    /// Create project
     public ProjectResponse createProject(CreateProjectRequest request){
         UUID currentUserId = securityUtil.getCurrentUserId();
         if(currentUserId == null)
@@ -65,7 +65,7 @@ public class ProjectService {
         return response;
     }
 
-    // Update project
+    /// Update project
     public ProjectResponse updateProject(UUID projectId, UpdateProjectRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -99,7 +99,7 @@ public class ProjectService {
         return response;
     }
 
-    //delete project
+    /// Delete project
     public void deleteProject(UUID projectId){
         UUID currentUserId = securityUtil.getCurrentUserId();
         ProjectMember member = projectMemberRepository
@@ -112,6 +112,8 @@ public class ProjectService {
 
         projectRepository.deleteById(projectId);
     }
+
+    /// Get all project
     public List<ProjectResponse> getAllProject(UUID userId) {
         return projectMemberRepository.findAllByUserId(userId)
                 .stream()
