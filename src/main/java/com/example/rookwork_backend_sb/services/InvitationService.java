@@ -53,7 +53,7 @@ public class InvitationService {
         }
 
         // Kiểm tra đã có invite pending chưa
-        if (invitationRepository.findByProject_IdAndInvitedUser_Id(
+        if (invitationRepository.findByProjectIdAndInvitedUserId(
                 projectId, invitedUser.getId()).isPresent()) {
             throw new ConflictException("Invitation already sent");
         }
@@ -123,7 +123,7 @@ public class InvitationService {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
         return invitationRepository
-                .findByInvitedUser_IdAndStatus(currentUserId, InvitationStatus.PENDING)
+                .findByInvitedUserIdAndStatus(currentUserId, InvitationStatus.PENDING)
                 .stream()
                 .map(inv -> InvitationResponse.builder()
                         .id(inv.getId())

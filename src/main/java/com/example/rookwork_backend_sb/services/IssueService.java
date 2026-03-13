@@ -10,7 +10,6 @@ import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -287,10 +286,10 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    // get by user id
-    public List<IssueResponse> getAllByAssignedTo_Id() {
+    // get issue by user id
+    public List<IssueResponse> getAllByAssignedToId() {
         UUID currentUserId= securityUtil.getCurrentUserId();
-        return issueRepository.findAllByAssignedTo_Id(currentUserId)
+        return issueRepository.findAllByAssignedToId(currentUserId)
                 .stream()
                 .map(issue -> IssueResponse.builder()
                         .id(issue.getId())

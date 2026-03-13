@@ -45,7 +45,7 @@ public class IssueController {
     // all
     @GetMapping("/assigned")
     public ResponseEntity<List<IssueResponse>> getAllIssuesByAssignedTo_Id(){
-        return ResponseEntity.ok(issueService.getAllByAssignedTo_Id());
+        return ResponseEntity.ok(issueService.getAllByAssignedToId());
     }
 
     // all issues of project
