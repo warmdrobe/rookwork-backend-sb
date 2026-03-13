@@ -12,6 +12,6 @@ import org.springframework.stereotype.Repository;
 public interface IssueRepository extends JpaRepository<Issue, UUID> {
     Optional<Issue> findById(UUID id);
     List<Issue> findAllByProjectId(UUID projectId);
-    List<Issue> findAllByAssignedTo_Id(UUID userId);
+    List<Issue> findAllByAssignedToId(UUID userId);
 
 }

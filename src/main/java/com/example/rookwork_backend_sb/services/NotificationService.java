@@ -19,7 +19,7 @@ public class NotificationService {
 
     public List<NotificationResponse> getAll() {
         UUID currentUserId = securityUtil.getCurrentUserId();
-        return notificationRepository.findAllByUser_Id(currentUserId)
+        return notificationRepository.findAllByUserId(currentUserId)
                 .stream()
                 .map(notification -> NotificationResponse.builder()
                         .id(notification.getId())
