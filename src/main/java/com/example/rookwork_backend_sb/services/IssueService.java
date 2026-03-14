@@ -1,5 +1,6 @@
 package com.example.rookwork_backend_sb.services;
 
+import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.dtos.issues.*;
 import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.exceptions.BadRequestException;
@@ -327,7 +328,7 @@ public class IssueService {
         response.setUpdatedAt(issue.getUpdatedAt());
 
         if (issue.getAssignedTo() != null) {
-            AssigneeResponse assignee = new AssigneeResponse();
+            UserSummary assignee = new UserSummary();
             assignee.setId(issue.getAssignedTo().getId());
             assignee.setProfileName(issue.getAssignedTo().getProfileName());
             assignee.setPicture(issue.getAssignedTo().getPicture());

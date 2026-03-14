@@ -1,5 +1,6 @@
 package com.example.rookwork_backend_sb.dtos.issues;
 
+import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
 import com.example.rookwork_backend_sb.entities.Status;
@@ -24,7 +25,7 @@ public class IssueResponse {
     public Status status;
     public UUID parentId;
     public UUID projectId;
-    public AssigneeResponse assignedTo;
+    public UserSummary assignedTo;
     public LocalDateTime deadline;
     public LocalDateTime createdAt;
     public LocalDateTime updatedAt;

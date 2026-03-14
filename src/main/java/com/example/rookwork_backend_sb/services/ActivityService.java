@@ -14,7 +14,7 @@ import java.util.UUID;
 @Service
 public class ActivityService {
     private final ActivityRepository activityRepository;
-
+    /// Log mapping config
     public void log (Project project, User actor,
                 ActivityAction action, ActivityEntityType entityType,
                 UUID entityId, String entityName,
@@ -39,6 +39,8 @@ public class ActivityService {
     }
 
     //// use activity log
+
+    /// Khi sửa issue
     // Trong IssueService khi update status
     // activityService.log(
     //    issue.getProject(),
@@ -61,4 +63,58 @@ public class ActivityService {
     //    null
     //);
 
+    /// Khi tạo comment
+    //activityService.log(
+    //    comment.getIssue().getProject(),
+    //    currentUser,
+    //    ActivityAction.COMMENTED,
+    //    ActivityEntityType.COMMENT,
+    //    comment.getId(),
+    //     comment.getIssue().getIssueName(),  // entityName = tên issue được comment
+    //    "{\"preview\": \"" + truncate(comment.getContent(), 50) + "\"}"
+    //);
+
+    /// Khi xóa comment
+    //activityService.log(
+    //    comment.getIssue().getProject(),
+    //    currentUser,
+    //    ActivityAction.DELETED,
+    //    ActivityEntityType.COMMENT,
+    //    comment.getId(),
+    //    comment.getIssue().getIssueName(),
+    //    null
+    //);
+
+    /// Khi gửi invitation
+    //activityService.log(
+    //    project,
+    //    inviter,
+    //    ActivityAction.INVITED,
+    //    ActivityEntityType.INVITATION,
+    //    invitation.getId(),
+    //    invitee.getEmail(),   // entityName = email người được mời
+    //    "{\"role\": \"" + invitation.getRole() + "\"}"
+    //);
+    //
+    //// Khi accept
+    //activityService.log(
+    //    project,
+    //    currentUser,
+    //    ActivityAction.ACCEPTED,
+    //    ActivityEntityType.INVITATION,
+    //    invitation.getId(),
+    //    currentUser.getEmail(),
+    //    null
+    //);
+    //
+    //// Khi decline
+    //activityService.log(
+    //    project,
+    //    currentUser,
+    //    ActivityAction.DECLINED,
+    //    ActivityEntityType.INVITATION,
+    //    invitation.getId(),
+    //    currentUser.getEmail(),
+    //    null
+    //);
 }
