@@ -30,6 +30,7 @@ public class InvitationService {
     private final SecurityUtil securityUtil;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /// Send invite
     public void sendInvite(UUID projectId, String invitedEmail) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -85,6 +86,7 @@ public class InvitationService {
         );
     }
 
+    /// Response (true - false)
     public void respondInvite(UUID invitationId, boolean accept) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -118,6 +120,7 @@ public class InvitationService {
         invitationRepository.save(invitation);
     }
 
+    /// Get pending invites
     public List<InvitationResponse> getPendingInvites() {
 
         UUID currentUserId = securityUtil.getCurrentUserId();

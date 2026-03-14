@@ -17,6 +17,7 @@ public class NotificationService {
     private final SecurityUtil securityUtil;
     private final NotificationRepository notificationRepository;
 
+    /// Get all
     public List<NotificationResponse> getAll() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository.findAllByUserId(currentUserId)
@@ -30,4 +31,8 @@ public class NotificationService {
                         .build())
                 .collect(Collectors.toList());
     }
+
+    /// Mark as read
+
+    /// Delete notification
 }
