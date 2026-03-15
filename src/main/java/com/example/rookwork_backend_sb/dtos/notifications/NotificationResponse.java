@@ -10,15 +10,14 @@ import java.util.UUID;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class NotificationResponse {
     private UUID id;
-    private UUID userId;
-    private UUID issueId;
     private String title;
     private String message;
-    private Boolean isRead;
+    private UUID issueId;
+    private String issueName;
+    private boolean isRead;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
