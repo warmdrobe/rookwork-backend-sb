@@ -57,6 +57,17 @@ public class SubTaskService {
 
         subTaskRepository.save(subTask);
 
+        activityService.log(
+                project,
+                currentUser,
+                ActivityAction.CREATED,
+                ActivityEntityType.SUBTASK,
+                subTask.getId(),
+                subTask.getSubtaskName(),
+                String.format("{\"issueId\":\"%s\",\"issueName\":\"%s\"}",
+                        issue.getId(), issue.getIssueName())
+        );
+
         return toResponse(subTask);
     }
 
@@ -79,6 +90,34 @@ public class SubTaskService {
 
         SubTask subTask = subTaskRepository.findByIdAndIssueId(subtaskId, issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));
+
+        if (request.getSubtaskName() != null) {
+            subTask.setSubtaskName(request.getSubtaskName());
+            activityService.log(project, currentUser,
+                    ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
+                    subTask.getId(), subTask.getSubtaskName(),
+                    String.format("{\"field\":\"name\",\"to\":\"%s\"}", request.getSubtaskName())
+            );
+        }
+
+        if (request.getSubtaskDescription() != null) {
+            subTask.setSubtaskDescription(request.getSubtaskDescription());
+            activityService.log(project, currentUser,
+                    ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
+                    subTask.getId(), subTask.getSubtaskName(),
+                    String.format("{\"field\":\"description\",\"to\":\"%s\"}", request.getSubtaskDescription())
+            );
+        }
+
+        if (request.getIsDone() != null) {
+            subTask.setDone(request.getIsDone());
+            activityService.log(project, currentUser,
+                    request.getIsDone() ? ActivityAction.COMPLETED : ActivityAction.UPDATED,
+                    ActivityEntityType.SUBTASK,
+                    subTask.getId(), subTask.getSubtaskName(),
+                    String.format("{\"field\":\"isDone\",\"to\":\"%s\"}", request.getIsDone())
+            );
+        }
 
         subTask.setUpdatedAt(LocalDateTime.now());
         subTaskRepository.save(subTask);
@@ -108,6 +147,16 @@ public class SubTaskService {
 
         SubTask subTask = subTaskRepository.findByIdAndIssueId(subtaskId, issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));
+
+        activityService.log(
+                project,
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.SUBTASK,
+                subTask.getId(),
+                subTask.getSubtaskName(),
+                null
+        );
 
         subTaskRepository.delete(subTask);
     }
