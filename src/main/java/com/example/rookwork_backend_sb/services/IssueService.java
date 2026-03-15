@@ -54,6 +54,7 @@ public class IssueService {
                 .status(request.getStatus())
                 .deadline(request.getDeadline())
                 .project(project)
+                .createdBy(currentUser)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();

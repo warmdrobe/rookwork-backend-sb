@@ -51,6 +51,10 @@ public class Issue {
     @JoinColumn(name = "assigned_to")
     private User assignedTo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
     @OneToMany(mappedBy = "parent")
     private List<Issue> children = new ArrayList<>();
 
