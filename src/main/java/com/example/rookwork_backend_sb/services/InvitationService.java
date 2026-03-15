@@ -93,13 +93,11 @@ public class InvitationService {
         Invitation invitation = invitationRepository.findById(invitationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
-        if (!invitation.getInvitedUser().getId().equals(currentUserId)) {
+        if (!invitation.getInvitedUser().getId().equals(currentUserId))
             throw new ForbiddenException("Not your invitation");
-        }
 
-        if (invitation.getStatus() != InvitationStatus.PENDING) {
+        if (invitation.getStatus() != InvitationStatus.PENDING)
             throw new ConflictException("Invitation already responded");
-        }
 
         if (accept) {
             invitation.setStatus(InvitationStatus.ACCEPTED);
@@ -118,6 +116,19 @@ public class InvitationService {
 
         invitation.setUpdatedAt(LocalDateTime.now());
         invitationRepository.save(invitation);
+
+        // Notify OWNER real-time khi đối phương respond
+        messagingTemplate.convertAndSendToUser(
+                invitation.getInvitedBy().getId().toString(),
+                "/queue/notifications",
+                Map.of(
+                        "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
+                        "invitationId", invitation.getId(),
+                        "projectId", invitation.getProject().getId(),
+                        "projectName", invitation.getProject().getProjectName(),
+                        "respondedBy", invitation.getInvitedUser().getProfileName()
+                )
+        );
     }
 
     /// Get pending invites
