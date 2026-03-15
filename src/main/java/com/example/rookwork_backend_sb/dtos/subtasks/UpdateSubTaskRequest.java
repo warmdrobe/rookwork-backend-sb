@@ -1,0 +1,10 @@
+package com.example.rookwork_backend_sb.dtos.subtasks;
+
+import lombok.Data;
+
+@Data
+public class UpdateSubTaskRequest {
+    private String subtaskName;
+    private String subtaskDescription;
+    private Boolean isDone;
+}
