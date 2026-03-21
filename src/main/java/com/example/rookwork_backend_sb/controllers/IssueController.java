@@ -13,16 +13,16 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @RestController
-@RequestMapping("api/issues")
+@RequestMapping("api/projects/{projectId}/issues")
 public class IssueController {
     private final IssueService issueService;
 
-    @PostMapping("/{projectId}")
+    @PostMapping
     public ResponseEntity<IssueResponse> createIssue(@PathVariable UUID projectId, @RequestBody CreateIssueRequest request){
         return ResponseEntity.ok(issueService.createIssue(projectId, request));
     }
 
-    @PutMapping("/{projectId}/{issueId}")
+    @PutMapping("/{issueId}")
     public ResponseEntity<IssueResponse> updateIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -33,13 +33,13 @@ public class IssueController {
         );
     }
 
-    @DeleteMapping("/{projectId}/{issueId}")
+    @DeleteMapping("/{issueId}")
     public ResponseEntity<Void> deleteIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId
     ){
-            issueService.deleteIssue(projectId, issueId);
-            return ResponseEntity.ok().build();
+        issueService.deleteIssue(projectId, issueId);
+        return ResponseEntity.ok().build();
     }
 
     // all
@@ -49,7 +49,7 @@ public class IssueController {
     }
 
     // all issues of project
-    @GetMapping("/{projectId}")
+    @GetMapping
     public ResponseEntity<List<IssueResponse>> getAllIssues(
             @PathVariable UUID projectId
     ){
