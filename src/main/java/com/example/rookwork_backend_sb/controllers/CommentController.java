@@ -11,13 +11,14 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/comments")
+//@RequestMapping("api/comments")
+@RequestMapping("api/projects/{projectId}")
 @RequiredArgsConstructor
 public class CommentController {
     private final CommentService commentService;
 
     /// Create comment
-    @PostMapping("/projects/{projectId}/issues/{issueId}")
+    @PostMapping("/issues/{issueId}/comments")
     public ResponseEntity<CommentResponse> createComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -26,7 +27,7 @@ public class CommentController {
     }
 
     /// Update comment
-    @PutMapping("/{commentId}/projects/{projectId}/issues/{issueId}")
+    @PutMapping("/issues/{issueId}/comments/{commentId}")
     public ResponseEntity<CommentResponse> updateComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -36,7 +37,7 @@ public class CommentController {
     }
 
     /// Delete comment
-    @DeleteMapping("/{commentId}/projects/{projectId}/issues/{issueId}")
+    @DeleteMapping("/issues/{issueId}/comments/{commentId}")
     public ResponseEntity<Void> deleteComment(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
@@ -46,14 +47,14 @@ public class CommentController {
     }
 
     /// Get comment by project id
-    @GetMapping("/projects/{projectId}")
+    @GetMapping("/comments")
     public ResponseEntity<List<CommentResponse>> getAllCommentByProjectId(
             @PathVariable UUID projectId) {
         return ResponseEntity.ok(commentService.getAllCommentByProjectId(projectId));
     }
 
     /// Get comment by issue id
-    @GetMapping("/issues/{issueId}")
+    @GetMapping("/issues/{issueId}/comments")
     public ResponseEntity<List<CommentResponse>> getAllCommentByIssueId(
             @PathVariable UUID issueId) {
         return ResponseEntity.ok(commentService.getAllCommentByIssueId(issueId));
