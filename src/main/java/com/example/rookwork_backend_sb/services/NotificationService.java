@@ -1,5 +1,6 @@
 package com.example.rookwork_backend_sb.services;
 
+import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.dtos.notifications.NotificationResponse;
 import com.example.rookwork_backend_sb.entities.Notification;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
@@ -20,7 +21,6 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final SecurityUtil securityUtil;
 
-    /// Get all notifications
     public List<NotificationResponse> getAll() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
@@ -30,7 +30,6 @@ public class NotificationService {
                 .toList();
     }
 
-    /// Get unread notifications
     public List<NotificationResponse> getUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
@@ -40,13 +39,11 @@ public class NotificationService {
                 .toList();
     }
 
-    /// Count unread
     public long countUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository.countByUserIdAndIsReadFalse(currentUserId);
     }
 
-    /// Mark one as read
     public void markAsRead(UUID notificationId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         Notification notification = notificationRepository.findById(notificationId)
@@ -60,7 +57,6 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    /// Mark all as read
     public void markAllAsRead() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         List<Notification> unread = notificationRepository
@@ -73,14 +69,30 @@ public class NotificationService {
         notificationRepository.saveAll(unread);
     }
 
-    /// Mapper
+    public void delete(UUID notificationId) {
+        UUID currentUserId = securityUtil.getCurrentUserId();
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+
+        if (!notification.getUser().getId().equals(currentUserId))
+            throw new ForbiddenException("Not your notification");
+
+        notificationRepository.delete(notification);
+    }
+
     private static NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId())
                 .title(n.getTitle())
+                .sender(n.getSender() != null ? UserSummary.builder()
+                        .id(n.getSender().getId())
+                        .profileName(n.getSender().getProfileName())
+                        .picture(n.getSender().getPicture())
+                        .build() : null)
                 .message(n.getMessage())
-                .issueId(n.getIssue().getId())
-                .issueName(n.getIssue().getIssueName())
+                .issueId(n.getIssue() != null ? n.getIssue().getId() : null)
+                .issueName(n.getIssue() != null ? n.getIssue().getIssueName() : null)
+                .invitationId(n.getInvitation() != null ? n.getInvitation().getId() : null)
                 .isRead(n.isRead())
                 .createdAt(n.getCreatedAt())
                 .build();

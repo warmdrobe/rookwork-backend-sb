@@ -118,6 +118,8 @@ public class IssueService {
                 throw new BadRequestException("Issue cannot be its own parent");
             }
             issue.setParent(parent);
+        } else {
+            issue.setParent(null);
         }
 
         if (request.getAssignedToId() != null) {
@@ -141,7 +143,9 @@ public class IssueService {
         messagingTemplate.convertAndSend(dest, (Object) payload);
 
         // Log + notify khi assign thay đổi
-        if (request.getAssignedToId() != null && !request.getAssignedToId().equals(oldAssigneeId)) {
+        if (request.getAssignedToId() != null
+                && !request.getAssignedToId().equals(oldAssigneeId)
+                && !request.getAssignedToId().equals(currentUserId))  {
             User assignee = issue.getAssignedTo();
 
             activityService.log(
@@ -157,6 +161,7 @@ public class IssueService {
 
             Notification notification = Notification.builder()
                     .user(assignee)
+                    .sender(currentUser)
                     .issue(issue)
                     .title("You have been assigned to an issue")
                     .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
@@ -280,36 +285,21 @@ public class IssueService {
 
     // get all
     public List<IssueResponse> getAllIssue(UUID projectId) {
-        UUID currentUserId= securityUtil.getCurrentUserId();
-        if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
+        UUID currentUserId = securityUtil.getCurrentUserId();
+        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
         return issueRepository.findAllByProjectId(projectId)
                 .stream()
-                .map(issue -> IssueResponse.builder()
-                        .id(issue.getId())
-                        .issueName(issue.getIssueName())
-                        .issueType(issue.getIssueType())
-                        .priority(issue.getPriority())
-                        .status(issue.getStatus())
-                        .deadline(issue.getDeadline())
-                        .build())
+                .map(issue -> getIssueResponse(projectId, issue))
                 .collect(Collectors.toList());
     }
 
     // get issue by user id
     public List<IssueResponse> getAllByAssignedToId() {
-        UUID currentUserId= securityUtil.getCurrentUserId();
+        UUID currentUserId = securityUtil.getCurrentUserId();
         return issueRepository.findAllByAssignedToId(currentUserId)
                 .stream()
-                .map(issue -> IssueResponse.builder()
-                        .id(issue.getId())
-                        .issueName(issue.getIssueName())
-                        .description(issue.getDescription())
-                        .issueType(issue.getIssueType())
-                        .priority(issue.getPriority())
-                        .status(issue.getStatus())
-                        .deadline(issue.getDeadline())
-                        .build())
+                .map(issue -> getIssueResponse(issue.getProject().getId(), issue))
                 .collect(Collectors.toList());
     }
 

@@ -24,6 +24,10 @@ public class Notification {
     @JoinColumn(name="user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="sender_id")
+    private User sender;
+
     @Column(name="title", nullable = false)
     private String title;
 
@@ -31,8 +35,12 @@ public class Notification {
     private String message;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name="issue_id", nullable = false)
+    @JoinColumn(name="issue_id", nullable = true)
     private Issue issue;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="invitation_id", nullable = true)
+    private Invitation invitation;
 
     @Column(name="is_read")
     private boolean isRead = false;

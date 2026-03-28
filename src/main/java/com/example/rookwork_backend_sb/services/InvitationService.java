@@ -5,10 +5,7 @@ import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.exceptions.ConflictException;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.repositories.InvitationRepository;
-import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
-import com.example.rookwork_backend_sb.repositories.ProjectRepository;
-import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -29,35 +26,28 @@ public class InvitationService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SecurityUtil securityUtil;
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationRepository notificationRepository;
 
-    /// Send invite
     public void sendInvite(UUID projectId, String invitedEmail) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Kiểm tra người gửi có phải OWNER không
         ProjectMember sender = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
-        if (sender.getRole() != ProjectRole.OWNER) {
+        if (sender.getRole() != ProjectRole.OWNER)
             throw new ForbiddenException("Only OWNER can invite members");
-        }
 
-        // Tìm user được invite
         User invitedUser = userRepository.findByEmail(invitedEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Kiểm tra đã là member chưa
         if (projectMemberRepository.findById(
-                new ProjectMemberId(invitedUser.getId(), projectId)).isPresent()) {
+                new ProjectMemberId(invitedUser.getId(), projectId)).isPresent())
             throw new ConflictException("User is already a member");
-        }
 
-        // Kiểm tra đã có invite pending chưa
         if (invitationRepository.findByProjectIdAndInvitedUserId(
-                projectId, invitedUser.getId()).isPresent()) {
+                projectId, invitedUser.getId()).isPresent())
             throw new ConflictException("Invitation already sent");
-        }
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
@@ -70,15 +60,27 @@ public class InvitationService {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-
         invitationRepository.save(invitation);
 
-        // Gửi real-time notification
+        Notification notification = Notification.builder()
+                .user(invitedUser)
+                .sender(sender.getUser())
+                .title("Project Invitation")
+                .message(sender.getUser().getProfileName()
+                        + " invited you to join \"" + project.getProjectName() + "\"")
+                .invitation(invitation)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        notificationRepository.save(notification);
+
         messagingTemplate.convertAndSendToUser(
                 invitedUser.getId().toString(),
                 "/queue/notifications",
                 Map.of(
                         "type", "INVITATION",
+                        "notificationId", notification.getId(),
                         "invitationId", invitation.getId(),
                         "projectName", project.getProjectName(),
                         "invitedBy", sender.getUser().getProfileName()
@@ -86,7 +88,6 @@ public class InvitationService {
         );
     }
 
-    /// Response (true - false)
     public void respondInvite(UUID invitationId, boolean accept) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -117,12 +118,25 @@ public class InvitationService {
         invitation.setUpdatedAt(LocalDateTime.now());
         invitationRepository.save(invitation);
 
-        // Notify OWNER real-time khi đối phương respond
+        Notification notification = Notification.builder()
+                .user(invitation.getInvitedBy())
+                .sender(invitation.getInvitedUser())
+                .title(accept ? "Invitation Accepted" : "Invitation Declined")
+                .message(invitation.getInvitedUser().getProfileName()
+                        + (accept ? " accepted" : " declined")
+                        + " your invitation to \"" + invitation.getProject().getProjectName() + "\"")
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        notificationRepository.save(notification);
+
         messagingTemplate.convertAndSendToUser(
                 invitation.getInvitedBy().getId().toString(),
                 "/queue/notifications",
                 Map.of(
                         "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
+                        "notificationId", notification.getId(),
                         "invitationId", invitation.getId(),
                         "projectId", invitation.getProject().getId(),
                         "projectName", invitation.getProject().getProjectName(),
@@ -131,11 +145,8 @@ public class InvitationService {
         );
     }
 
-    /// Get pending invites
     public List<InvitationResponse> getPendingInvites() {
-
         UUID currentUserId = securityUtil.getCurrentUserId();
-
         return invitationRepository
                 .findByInvitedUserIdAndStatus(currentUserId, InvitationStatus.PENDING)
                 .stream()
