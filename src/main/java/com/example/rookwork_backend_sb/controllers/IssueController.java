@@ -13,46 +13,41 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @RestController
-@RequestMapping("api/projects/{projectId}/issues")
+@RequestMapping
 public class IssueController {
     private final IssueService issueService;
 
-    @PostMapping
-    public ResponseEntity<IssueResponse> createIssue(@PathVariable UUID projectId, @RequestBody CreateIssueRequest request){
+    @PostMapping("api/projects/{projectId}/issues")
+    public ResponseEntity<IssueResponse> createIssue(
+            @PathVariable UUID projectId,
+            @RequestBody CreateIssueRequest request) {
         return ResponseEntity.ok(issueService.createIssue(projectId, request));
     }
 
-    @PutMapping("/{issueId}")
+    @PutMapping("api/projects/{projectId}/issues/{issueId}")
     public ResponseEntity<IssueResponse> updateIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @RequestBody UpdateIssueRequest request
-    ) {
-        return ResponseEntity.ok(
-                issueService.updateIssue(projectId, issueId, request)
-        );
+            @RequestBody UpdateIssueRequest request) {
+        return ResponseEntity.ok(issueService.updateIssue(projectId, issueId, request));
     }
 
-    @DeleteMapping("/{issueId}")
+    @DeleteMapping("api/projects/{projectId}/issues/{issueId}")
     public ResponseEntity<Void> deleteIssue(
             @PathVariable UUID projectId,
-            @PathVariable UUID issueId
-    ){
+            @PathVariable UUID issueId) {
         issueService.deleteIssue(projectId, issueId);
         return ResponseEntity.ok().build();
     }
 
-    // all
-    @GetMapping("/assigned")
-    public ResponseEntity<List<IssueResponse>> getAllIssuesByAssignedTo_Id(){
-        return ResponseEntity.ok(issueService.getAllByAssignedToId());
+    @GetMapping("api/projects/{projectId}/issues")
+    public ResponseEntity<List<IssueResponse>> getAllIssues(
+            @PathVariable UUID projectId) {
+        return ResponseEntity.ok(issueService.getAllIssue(projectId));
     }
 
-    // all issues of project
-    @GetMapping
-    public ResponseEntity<List<IssueResponse>> getAllIssues(
-            @PathVariable UUID projectId
-    ){
-        return ResponseEntity.ok(issueService.getAllIssue(projectId));
+    @GetMapping("api/issues/assigned")
+    public ResponseEntity<List<IssueResponse>> getAssignedIssues() {
+        return ResponseEntity.ok(issueService.getAllByAssignedToId());
     }
 }

@@ -5,6 +5,8 @@ import com.example.rookwork_backend_sb.entities.Issue;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.example.rookwork_backend_sb.entities.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +16,8 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
     List<Issue> findAllByProjectId(UUID projectId);
     List<Issue> findAllByAssignedToId(UUID userId);
     Optional<Issue> findByIdAndProjectId(UUID id, UUID projectId);
+
+    //process
+    long countByProjectId(UUID projectId);
+    long countByProjectIdAndStatus(UUID projectId, Status status);
 }
