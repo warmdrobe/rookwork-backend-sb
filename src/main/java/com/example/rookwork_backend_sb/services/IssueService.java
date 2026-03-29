@@ -303,6 +303,14 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
+    /// get issue by id
+    public IssueResponse getIssueById(UUID issueId) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        return getIssueResponse(issue.getProject().getId(), issue);
+    }
+
     // issue mapping
     private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();

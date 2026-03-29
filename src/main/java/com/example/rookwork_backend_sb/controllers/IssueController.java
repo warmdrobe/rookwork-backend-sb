@@ -50,4 +50,10 @@ public class IssueController {
     public ResponseEntity<List<IssueResponse>> getAssignedIssues() {
         return ResponseEntity.ok(issueService.getAllByAssignedToId());
     }
+
+    @GetMapping("api/issues/{issueId}")
+    public ResponseEntity<IssueResponse> getIssueById(
+            @PathVariable UUID issueId) {
+        return ResponseEntity.ok(issueService.getIssueById(issueId));
+    }
 }
