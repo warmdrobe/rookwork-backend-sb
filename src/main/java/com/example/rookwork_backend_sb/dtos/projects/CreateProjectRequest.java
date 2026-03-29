@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class CreateProjectRequest {
     public String projectName;
+    public String description;
 }

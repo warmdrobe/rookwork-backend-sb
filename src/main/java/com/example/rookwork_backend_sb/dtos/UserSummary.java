@@ -15,4 +15,5 @@ public class UserSummary {
     public UUID id;
     public String profileName;
     public String picture;
+    public String email;
 }

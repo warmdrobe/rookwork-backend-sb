@@ -30,6 +30,9 @@ public class Project {
     @Column(name="updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name="project_name", nullable = false)
     private  String projectName;
 

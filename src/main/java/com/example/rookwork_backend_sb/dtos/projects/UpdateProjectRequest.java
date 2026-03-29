@@ -5,5 +5,6 @@ import lombok.Data;
 @Data
 public class UpdateProjectRequest {
     public String projectName;
+    public String description;
     public Boolean isPrivate;
 }

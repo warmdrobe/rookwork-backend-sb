@@ -1,5 +1,6 @@
 package com.example.rookwork_backend_sb.services;
 
+import com.example.rookwork_backend_sb.dtos.activities.ActivityResponse;
 import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.repositories.ActivityRepository;
 import lombok.AllArgsConstructor;
@@ -117,4 +118,33 @@ public class ActivityService {
     //    currentUser.getEmail(),
     //    null
     //);
+
+    public List<ActivityResponse> getProjectActivityResponses(UUID projectId, int limit) {
+        return getProjectActivities(projectId, limit).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<ActivityResponse> getIssueActivity(UUID projectId, UUID issueId, int limit) {
+        return activityRepository
+                .findIssueActivities(projectId, issueId, PageRequest.of(0, limit))
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /** Map Activity entity → ActivityResponse DTO */
+    private ActivityResponse toResponse(Activity a) {
+        return ActivityResponse.builder()
+                .id(a.getId())
+                .actorName(a.getActor().getProfileName())
+                .actorPicture(a.getActor().getPicture())
+                .actionType(a.getActionType().name())
+                .entityType(a.getEntityType().name())
+                .entityId(a.getEntityId())
+                .entityName(a.getEntityName())
+                .metadata(a.getMetadata())
+                .createdAt(a.getCreatedAt())
+                .build();
+    }
 }

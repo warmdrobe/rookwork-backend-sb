@@ -112,6 +112,7 @@ public class CommentService {
 
             Notification notification = Notification.builder()
                     .user(assignee)
+                    .sender(currentUser)
                     .issue(issue)
                     .title("New comment on your issue")
                     .message(String.format("%s commented on \"%s\" in project \"%s\"",
@@ -148,6 +149,7 @@ public class CommentService {
 
             Notification notification = Notification.builder()
                     .user(issueCreator)
+                    .sender(currentUser)
                     .issue(issue)
                     .title("New comment on your issue")
                     .message(String.format("%s commented on \"%s\" in project \"%s\"",
@@ -186,6 +188,7 @@ public class CommentService {
 
             Notification notification = Notification.builder()
                     .user(parentAuthor)
+                    .sender(currentUser)
                     .issue(issue)
                     .title("Someone replied to your comment")
                     .message(String.format("%s replied to your comment on \"%s\"",
@@ -296,28 +299,11 @@ public class CommentService {
     }
 
     /// Get comment by issue id
-    public List<CommentResponse> getAllCommentByIssueId ( UUID issueId){
+    public List<CommentResponse> getAllCommentByIssueId(UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-
-        return commentRepository.findByIssueId(issueId)
+        return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)
                 .stream()
-                .map(comment -> CommentResponse.builder()
-                        .id(comment.getId())
-                        .content(comment.getContent())
-                        .issueId(comment.getIssue().getId())
-                        .createdAt(comment.getCreatedAt())
-                        .updatedAt(comment.getUpdatedAt())
-                        .parentCommentId(comment.getParentComment()!= null
-                                ? comment.getParentComment().getId()
-                                : null)
-                        .user(
-                                UserSummary.builder()
-                                        .id(comment.getUser().getId())
-                                        .profileName(comment.getUser().getProfileName())
-                                        .picture(comment.getUser().getPicture())
-                                        .build()
-                        )
-                        .build())
+                .map(CommentService::getCommentResponse)
                 .toList();
     }
 
