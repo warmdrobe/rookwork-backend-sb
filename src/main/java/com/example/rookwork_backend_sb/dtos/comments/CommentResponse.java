@@ -1,7 +1,6 @@
 package com.example.rookwork_backend_sb.dtos.comments;
 
 import com.example.rookwork_backend_sb.dtos.UserSummary;
-import com.example.rookwork_backend_sb.entities.Comment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,12 +15,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CommentResponse {
-    public UUID id;
-    public String content;
-    public UUID issueId;
-    public UserSummary user;
-    public LocalDateTime createdAt;
-    public LocalDateTime updatedAt;
-    public UUID parentCommentId;
-    public Set<CommentResponse> replies;
+  public UUID id;
+  public String content;
+  public UUID issueId;
+  public UserSummary user;
+  public LocalDateTime createdAt;
+  public LocalDateTime updatedAt;
+  public UUID parentCommentId;
+  public Set<CommentResponse> replies;
 }
