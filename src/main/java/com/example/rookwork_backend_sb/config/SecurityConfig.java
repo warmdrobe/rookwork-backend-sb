@@ -25,71 +25,69 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter;
-    private final CustomUserDetailsService userDetailsService;
+  private final JwtFilter jwtFilter;
+  private final CustomUserDetailsService userDetailsService;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)
-            throws Exception {
+  @Bean
+  public SecurityFilterChain securityFilterChain(HttpSecurity http)
+      throws Exception {
 
-        http
-                .cors(cors -> {})
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+    http
+        .cors(cors -> {
+        })
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/api/auth/**").permitAll()
+            .requestMatchers("/ws/**").permitAll()
+            .anyRequest().authenticated())
+        .authenticationProvider(authenticationProvider())
+        .addFilterBefore(jwtFilter,
+            UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+    return http.build();
+  }
 
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
+  @Bean
+  public AuthenticationProvider authenticationProvider() {
 
-        DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(userDetailsService);
+    DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
 
-        provider.setPasswordEncoder(passwordEncoder());
+    provider.setPasswordEncoder(passwordEncoder());
 
-        return provider;
-    }
+    return provider;
+  }
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config
-    ) throws Exception {
-        return config.getAuthenticationManager();
-    }
+  @Bean
+  public AuthenticationManager authenticationManager(
+      AuthenticationConfiguration config) throws Exception {
+    return config.getAuthenticationManager();
+  }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
-    // CORS config for connect borowser
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://127.0.0.1:5500",
-                "http://localhost:3000",
-                "http://localhost:8080",
-                "http://127.0.0.1:3000",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
+  // CORS config for connect borowser
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(List.of(
+        // local dev
+        "http://127.0.0.1:5500",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        // Production dev
+        "https://rookwork.asia"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+    return source;
+  }
 }
