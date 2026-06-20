@@ -15,8 +15,8 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v3
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "21"
+          distribution: "temurin"
 
       - name: Build JAR
         run: ./mvnw clean package -DskipTests
@@ -41,7 +41,7 @@ jobs:
             sudo docker stop rookwork-backend || true
             sudo docker rm rookwork-backend || true
             sudo docker rmi rookwork-backend || true
-            sudo docker build -t rookwork-backend .
+            sudo docker build --no-cache -t rookwork-backend .
             sudo docker run -d \
               --restart always \
               --name rookwork-backend \
