@@ -50,4 +50,6 @@ jobs:
               -e DB_USERNAME='${{ secrets.DB_USERNAME }}' \
               -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
               -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+              -e JWT_EXPIRATION='604800000' \
+              -e JWT_REFRESH_EXPIRATION='2592000000' \
               rookwork-backend
