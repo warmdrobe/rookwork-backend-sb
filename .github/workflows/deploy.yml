@@ -28,7 +28,7 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "target/*.jar"
-          target: "~/rookwork-backend-sb/target/"
+          target: "~/rookwork-backend-sb/"
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@master
