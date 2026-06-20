@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -23,5 +23,5 @@ public class NotificationResponse {
     private String issueName;
     private UUID invitationId;
     private boolean isRead;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

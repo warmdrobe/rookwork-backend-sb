@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,8 +19,8 @@ public class CommentResponse {
   public String content;
   public UUID issueId;
   public UserSummary user;
-  public LocalDateTime createdAt;
-  public LocalDateTime updatedAt;
+  public Instant createdAt;
+  public Instant updatedAt;
   public UUID parentCommentId;
   public Set<CommentResponse> replies;
 }

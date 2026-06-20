@@ -14,12 +14,16 @@ import lombok.AllArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+/**
+ * Service class for managing project issues, subtasks, assignments, status changes, and related notifications.
+ */
 @AllArgsConstructor
 @Service
 public class IssueService {
@@ -32,11 +36,21 @@ public class IssueService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
 
-    // create issue
+    /**
+     * Creates a new issue in a project and logs the creation activity.
+     *
+     * @param projectId the unique identifier of the project
+     * @param request the issue creation request details
+     * @return the created IssueResponse DTO
+     * @throws ForbiddenException if the current user is not a member of the project
+     * @throws UnauthorizedException if the user is not authenticated
+     * @throws ResourceNotFoundException if the project is not found
+     */
     @Transactional
     public IssueResponse createIssue(UUID projectId, CreateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Verify the creator is a member of the project
         if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -55,12 +69,13 @@ public class IssueService {
                 .deadline(request.getDeadline())
                 .project(project)
                 .createdBy(currentUser)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
 
         issueRepository.save(issue);
 
+        // Log issue creation activity
         activityService.log(
                 issue.getProject(),
                 currentUser,
@@ -74,10 +89,22 @@ public class IssueService {
         return getIssueResponse(projectId, issue);
     }
 
-    // update issue
+    /**
+     * Updates an existing issue's fields, broadcasts the change to members, and logs activities.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param request the fields to update
+     * @return the updated IssueResponse DTO
+     * @throws ForbiddenException if the current user is not a project member
+     * @throws UnauthorizedException if the user is not authenticated
+     * @throws ResourceNotFoundException if the project, issue, or assignee is not found
+     * @throws BadRequestException if the update creates an invalid hierarchical dependency
+     */
     public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Verify project membership
         if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -94,6 +121,7 @@ public class IssueService {
         Status oldStatus = issue.getStatus();
         UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
 
+        // Conditionally update updated fields
         if (request.getIssueName() != null) {
             issue.setIssueName(request.getIssueName());
         }
@@ -107,9 +135,10 @@ public class IssueService {
         }
 
         if (request.getDeadline() != null) {
-            issue.setDeadline(request.getDeadline().atStartOfDay());
+            issue.setDeadline(request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant());
         }
 
+        // Parent issue validation
         if (request.getParentId() != null) {
             Issue parent = issueRepository
                     .findByIdAndProjectId(request.getParentId(), projectId)
@@ -132,17 +161,17 @@ public class IssueService {
             issue.setStatus(request.getStatus());
         }
 
-        issue.setUpdatedAt(LocalDateTime.now());
+        issue.setUpdatedAt(Instant.now());
         issueRepository.save(issue);
 
-        // Broadcast issue update tới tất cả member đang xem project (để test WS + real-time UI)
+        // Broadcast the issue update via WebSocket to project subscribers
         String dest = "/topic/project/" + projectId + "/issues";
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "ISSUE_UPDATED");
         payload.put("issue", getIssueResponse(projectId, issue));
         messagingTemplate.convertAndSend(dest, (Object) payload);
 
-        // Log + notify khi assign thay đổi
+        // Handle assignee change activity log and push notifications
         if (request.getAssignedToId() != null
                 && !request.getAssignedToId().equals(oldAssigneeId)
                 && !request.getAssignedToId().equals(currentUserId))  {
@@ -169,8 +198,8 @@ public class IssueService {
                             issue.getIssueName(),
                             project.getProjectName()))
                     .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
                     .build();
 
             notificationRepository.save(notification);
@@ -189,7 +218,7 @@ public class IssueService {
             );
         }
 
-        // Log status changed
+        // Log status change activity
         if (request.getStatus() != null && request.getStatus() != oldStatus) {
             if (request.getStatus() == Status.DONE) {
                 activityService.log(
@@ -212,7 +241,7 @@ public class IssueService {
             }
         }
 
-        // Log priority changed
+        // Log other modifications (priority, name, description, deadline) if changed
         if (request.getPriority() != null) {
             activityService.log(
                     project, currentUser,
@@ -224,7 +253,6 @@ public class IssueService {
             );
         }
 
-        // Log name changed
         if (request.getIssueName() != null) {
             activityService.log(
                     project, currentUser,
@@ -236,7 +264,6 @@ public class IssueService {
             );
         }
 
-        // Log description changed
         if (request.getDescription() != null) {
             activityService.log(
                     project, currentUser,
@@ -248,7 +275,6 @@ public class IssueService {
             );
         }
 
-        // Log deadline changed
         if (request.getDeadline() != null) {
             activityService.log(
                     project, currentUser,
@@ -263,7 +289,14 @@ public class IssueService {
         return getIssueResponse(projectId, issue);
     }
 
-    //delete
+    /**
+     * Deletes an issue. Only authorized for project OWNERs.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @throws ForbiddenException if current user is not a member or not the project owner
+     * @throws ResourceNotFoundException if the issue is not found
+     */
     public void deleteIssue(UUID projectId, UUID issueId) {
 
         UUID currentUserId = securityUtil.getCurrentUserId();
@@ -272,6 +305,7 @@ public class IssueService {
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ForbiddenException("Not a member of project"));
 
+        // Only the project owner can delete issues
         if (member.getRole() != ProjectRole.OWNER) {
             throw new ForbiddenException("Only OWNER can delete issue");
         }
@@ -283,7 +317,13 @@ public class IssueService {
         issueRepository.delete(issue);
     }
 
-    // get all
+    /**
+     * Retrieves all issues belonging to a project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return a list of IssueResponse DTOs
+     * @throws ForbiddenException if user is not a project member
+     */
     public List<IssueResponse> getAllIssue(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
@@ -294,7 +334,11 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    // get issue by user id
+    /**
+     * Retrieves all issues assigned to the current user.
+     *
+     * @return a list of IssueResponse DTOs assigned to the user
+     */
     public List<IssueResponse> getAllByAssignedToId() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return issueRepository.findAllByAssignedToId(currentUserId)
@@ -303,7 +347,13 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    /// get issue by id
+    /**
+     * Retrieves details of a specific issue by its ID.
+     *
+     * @param issueId the unique identifier of the issue
+     * @return the IssueResponse DTO
+     * @throws ResourceNotFoundException if the issue is not found
+     */
     public IssueResponse getIssueById(UUID issueId) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));

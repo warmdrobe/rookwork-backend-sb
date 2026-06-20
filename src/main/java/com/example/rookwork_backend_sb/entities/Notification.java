@@ -3,7 +3,7 @@ package com.example.rookwork_backend_sb.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -46,8 +46,8 @@ public class Notification {
     private boolean isRead = false;
 
     @Column(name="created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name="updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

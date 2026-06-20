@@ -5,7 +5,7 @@ import com.example.rookwork_backend_sb.entities.PriorityType;
 import com.example.rookwork_backend_sb.entities.Status;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class CreateIssueRequest {
@@ -13,6 +13,6 @@ public class CreateIssueRequest {
     public IssueType issueType;
     public PriorityType priority;
     public String description;
-    public LocalDateTime deadline;
+    public Instant deadline;
     public Status status;
 }

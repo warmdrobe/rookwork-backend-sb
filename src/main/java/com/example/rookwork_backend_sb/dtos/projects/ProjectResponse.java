@@ -8,7 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +27,6 @@ public class ProjectResponse {
     public List<UserSummary> members;
     public long totalIssues;
     public long doneIssues;
-    public LocalDateTime createdAt;
-    public LocalDateTime updatedAt;
+    public Instant createdAt;
+    public Instant updatedAt;
 }

@@ -3,7 +3,7 @@ package com.example.rookwork_backend_sb.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -44,13 +44,13 @@ public class User {
     private String refreshTokenHash;
 
     @Column(name="refresh_token_expires_at")
-    private LocalDateTime refreshTokenExpiresAt;
+    private Instant refreshTokenExpiresAt;
 
     @Column(name="created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name="updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();

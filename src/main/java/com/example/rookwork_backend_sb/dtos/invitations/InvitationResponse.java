@@ -3,7 +3,7 @@ package com.example.rookwork_backend_sb.dtos.invitations;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -16,5 +16,5 @@ public class InvitationResponse {
     private UUID invitedById;
     private String invitedByName;
     private String status;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

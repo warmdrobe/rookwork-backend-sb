@@ -14,12 +14,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 
+/**
+ * Service class handling comment creation, modification, deletion, and real-time broadcasting.
+ */
 @Service
 @RequiredArgsConstructor
 public class CommentService {
@@ -32,11 +35,22 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
-    /// Create comment
+    /**
+     * Creates a new comment under an issue, logs activity, and sends notifications.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param request the comment request data
+     * @return the created CommentResponse DTO
+     * @throws ForbiddenException if the user is not a member of the project
+     * @throws UnauthorizedException if the user is not authenticated
+     * @throws ResourceNotFoundException if project, issue, or parent comment is not found
+     */
     @Transactional
     public CommentResponse createComment(UUID projectId, UUID issueId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Check if the current user has permission to comment on this project
         if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -49,7 +63,7 @@ public class CommentService {
         Issue issue = issueRepository.findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
-        // Xử lý reply (nếu có parentCommentId)
+        // Resolve parent comment for replies
         Comment parent = null;
         if (request.getParentCommentId() != null) {
             parent = commentRepository.findById(request.getParentCommentId())
@@ -61,12 +75,12 @@ public class CommentService {
                 .issue(issue)
                 .user(currentUser)
                 .parentComment(parent)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
         commentRepository.save(comment);
 
-        // Log activity
+        // Log comment activity
         activityService.log(
                 project,
                 currentUser,
@@ -95,7 +109,7 @@ public class CommentService {
                 .replies(Set.of())
                 .build();
 
-        // Broadcast tới tất cả đang xem issue
+        // Broadcast the new comment via WebSocket to all users viewing the issue
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "NEW_COMMENT");
         payload.put("comment", response);
@@ -104,7 +118,7 @@ public class CommentService {
                 (Object) payload
         );
 
-        // Notify assignee (nếu có và không phải người comment)
+        // Notify the issue assignee if the comment was written by someone else
         if (issue.getAssignedTo() != null &&
                 !issue.getAssignedTo().getId().equals(currentUserId)) {
 
@@ -116,12 +130,12 @@ public class CommentService {
                     .issue(issue)
                     .title("New comment on your issue")
                     .message(String.format("%s commented on \"%s\" in project \"%s\"",
-                            currentUser.getProfileName(),
-                            issue.getIssueName(),
-                            project.getProjectName()))
+                             currentUser.getProfileName(),
+                             issue.getIssueName(),
+                             project.getProjectName()))
                     .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
                     .build();
             notificationRepository.save(notification);
 
@@ -139,7 +153,7 @@ public class CommentService {
             );
         }
 
-        // Notify người tạo issue (nếu không phải người comment và không trùng assignee)
+        // Notify the issue creator if they are not the author or assignee
         if (issue.getCreatedBy() != null &&
                 !issue.getCreatedBy().getId().equals(currentUserId) &&
                 (issue.getAssignedTo() == null ||
@@ -157,8 +171,8 @@ public class CommentService {
                             issue.getIssueName(),
                             project.getProjectName()))
                     .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
                     .build();
             notificationRepository.save(notification);
 
@@ -176,7 +190,7 @@ public class CommentService {
             );
         }
 
-        // Notify người viết comment gốc (nếu là reply, không trùng assignee/creator)
+        // Notify the author of the parent comment if this is a reply
         if (parent != null &&
                 !parent.getUser().getId().equals(currentUserId) &&
                 (issue.getAssignedTo() == null ||
@@ -195,8 +209,8 @@ public class CommentService {
                             currentUser.getProfileName(),
                             issue.getIssueName()))
                     .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
                     .build();
             notificationRepository.save(notification);
 
@@ -216,11 +230,22 @@ public class CommentService {
 
         return response;
     }
-    /// Update comment
+    /**
+     * Updates the content of an existing comment.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param commentId the unique identifier of the comment to update
+     * @param request the updated comment data
+     * @return the updated CommentResponse DTO
+     * @throws ForbiddenException if user is not a project member or is not the author of the comment
+     * @throws ResourceNotFoundException if the comment is not found
+     */
     @Transactional
     public CommentResponse updateComment(UUID projectId, UUID issueId, UUID commentId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Check project membership
         if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -230,15 +255,15 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
-        // Chỉ người viết comment mới được sửa
+        // Verify that only the original author can edit the comment
         if (!comment.getUser().getId().equals(currentUserId))
             throw new ForbiddenException("You can only edit your own comment");
 
         comment.setContent(request.getContent());
-        comment.setUpdatedAt(LocalDateTime.now());
+        comment.setUpdatedAt(Instant.now());
         commentRepository.save(comment);
 
-        // Broadcast update
+        // Broadcast updated comment via WebSocket
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "UPDATED_COMMENT");
         payload.put("comment", getCommentResponse(comment));
@@ -250,7 +275,15 @@ public class CommentService {
         return getCommentResponse(comment);
     }
 
-    /// Delete comment
+    /**
+     * Deletes a comment. Only the author or a project owner is authorized.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param commentId the unique identifier of the comment to delete
+     * @throws ForbiddenException if user is not authorized to delete the comment
+     * @throws ResourceNotFoundException if the comment is not found
+     */
     @Transactional
     public void deleteComment(UUID projectId, UUID issueId, UUID commentId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
@@ -261,11 +294,11 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
-        // Chỉ người viết comment hoặc OWNER mới được xóa
         ProjectMember currentMember = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
+        // Only the comment author or project OWNER is allowed to delete a comment
         boolean isOwner = currentMember.getRole() == ProjectRole.OWNER;
         boolean isAuthor = comment.getUser().getId().equals(currentUserId);
 
@@ -274,7 +307,7 @@ public class CommentService {
 
         commentRepository.delete(comment);
 
-        // Broadcast delete
+        // Broadcast deleted comment ID via WebSocket
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "DELETED_COMMENT");
         payload.put("commentId", commentId);
@@ -285,7 +318,13 @@ public class CommentService {
         );
     }
 
-    /// Get comment by project id
+    /**
+     * Retrieves all comments associated with a project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return a list of CommentResponse DTOs for the project
+     * @throws ForbiddenException if the current user is not a member of the project
+     */
     public List<CommentResponse> getAllCommentByProjectId(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -298,7 +337,12 @@ public class CommentService {
                 .toList();
     }
 
-    /// Get comment by issue id
+    /**
+     * Retrieves all root comments (replies nested recursively) for a specific issue.
+     *
+     * @param issueId the unique identifier of the issue
+     * @return a list of top-level CommentResponse DTOs
+     */
     public List<CommentResponse> getAllCommentByIssueId(UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)

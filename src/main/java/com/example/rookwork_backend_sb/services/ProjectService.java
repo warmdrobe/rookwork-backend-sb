@@ -17,11 +17,14 @@ import com.example.rookwork_backend_sb.security.SecurityUtil;
 import org.springframework.stereotype.Service;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Service class handling project operations including creation, metadata updates, deletion, and retrieval.
+ */
 @AllArgsConstructor
 @Service
 public class ProjectService {
@@ -30,7 +33,15 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
-    /// Create project
+
+    /**
+     * Creates a new project and sets the creator as the project owner.
+     *
+     * @param request the project creation details
+     * @return the created ProjectResponse DTO
+     * @throws UnauthorizedException if user is not authenticated
+     * @throws ResourceNotFoundException if user is not found in database
+     */
     public ProjectResponse createProject(CreateProjectRequest request){
         UUID currentUserId = securityUtil.getCurrentUserId();
         if(currentUserId == null)
@@ -42,18 +53,19 @@ public class ProjectService {
                 .projectName(request.projectName)
                 .description(request.description)
                 .isPrivate(true)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
         projectRepository.save(project);
 
+        // Automatically assign the creator as the OWNER member of the new project
         ProjectMember projectMember = ProjectMember.builder()
                 .id(new ProjectMemberId(currentUserId,project.getId()))
                 .user(user)
                 .project(project)
                 .role(ProjectRole.OWNER)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
         projectMemberRepository.save(projectMember);
 
@@ -68,7 +80,15 @@ public class ProjectService {
         return response;
     }
 
-    /// Update project
+    /**
+     * Updates project metadata (name, description, privacy). Only allowed for project OWNERs.
+     *
+     * @param projectId the unique identifier of the project to update
+     * @param request the fields to update
+     * @return the updated ProjectResponse DTO
+     * @throws ResourceNotFoundException if user is not a member of the project
+     * @throws ForbiddenException if user is not the project owner
+     */
     public ProjectResponse updateProject(UUID projectId, UpdateProjectRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -76,6 +96,7 @@ public class ProjectService {
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Not a member of this project"));
 
+        // Only the OWNER of the project has permission to edit project settings
         if (member.getRole() != ProjectRole.OWNER) {
             throw new ForbiddenException("Only OWNER can update project");
         }
@@ -91,7 +112,7 @@ public class ProjectService {
         if (request.getIsPrivate() != null)
             project.setPrivate(request.getIsPrivate());
 
-        project.setUpdatedAt(LocalDateTime.now());
+        project.setUpdatedAt(Instant.now());
         projectRepository.save(project);
 
         ProjectResponse response = new ProjectResponse();
@@ -105,13 +126,20 @@ public class ProjectService {
         return response;
     }
 
-    /// Delete project
+    /**
+     * Deletes a project. Only allowed for project OWNERs.
+     *
+     * @param projectId the unique identifier of the project to delete
+     * @throws ResourceNotFoundException if user is not a member of the project
+     * @throws ForbiddenException if user is not the project owner
+     */
     public void deleteProject(UUID projectId){
         UUID currentUserId = securityUtil.getCurrentUserId();
         ProjectMember member = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Not a member of project"));
 
+        // Only the OWNER can delete the project entirely
         if(member.getRole() != ProjectRole.OWNER){
             throw new ForbiddenException("Only OWNER can delete this project");
         }
@@ -119,7 +147,12 @@ public class ProjectService {
         projectRepository.deleteById(projectId);
     }
 
-    /// Get all project
+    /**
+     * Retrieves all projects that the current user is a member of, along with statistics.
+     *
+     * @return a list of ProjectResponse DTOs containing members list and issue statistics
+     * @throws UnauthorizedException if user is not authenticated
+     */
     public List<ProjectResponse> getAllProject() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         if (currentUserId == null)
@@ -128,17 +161,18 @@ public class ProjectService {
         return projectMemberRepository.findAllByUser_Id(currentUserId)
                 .stream()
                 .map(member -> {
-                    // Lấy tất cả members của project đó
+                    // Fetch all project members details
                     List<UserSummary> members = projectMemberRepository
                             .findAllByProject_Id(member.getProject().getId())
                             .stream()
                             .map(pm -> UserSummary.builder()
-                                    .id(pm.getUser().getId())
-                                    .profileName(pm.getUser().getProfileName())
-                                    .picture(pm.getUser().getPicture())
-                                    .build())
+                                     .id(pm.getUser().getId())
+                                     .profileName(pm.getUser().getProfileName())
+                                     .picture(pm.getUser().getPicture())
+                                     .build())
                             .collect(Collectors.toList());
 
+                    // Count total and resolved issues within the project
                     long total = issueRepository.countByProjectId(member.getProject().getId());
                     long done = issueRepository.countByProjectIdAndStatus(member.getProject().getId(), Status.DONE);
 

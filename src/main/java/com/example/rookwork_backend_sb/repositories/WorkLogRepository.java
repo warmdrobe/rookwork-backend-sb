@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,7 +15,7 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
 
     // Lấy tất cả logs của user trong khoảng thời gian
     List<WorkLog> findAllByUser_IdAndLoggedAtBetween(
-            UUID userId, LocalDateTime from, LocalDateTime to
+            UUID userId, Instant from, Instant to
     );
 
     // Lấy tất cả logs của một issue (để hiển thị trong TaskPanel)
@@ -32,7 +32,7 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
     """)
     List<Object[]> sumHoursByDay(
             @Param("userId") UUID userId,
-            @Param("from") LocalDateTime from,
-            @Param("to") LocalDateTime to
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 }

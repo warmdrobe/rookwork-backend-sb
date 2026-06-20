@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -21,5 +21,5 @@ public class ActivityResponse {
     private UUID entityId;
     private String entityName;
     private String metadata;     // JSON string
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

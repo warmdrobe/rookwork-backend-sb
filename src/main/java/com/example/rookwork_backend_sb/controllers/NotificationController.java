@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Controller exposing endpoints for managing user notifications (retrieval, unread counts, status updates, deletion).
+ */
 @RestController
 @RequestMapping("api/notifications")
 @RequiredArgsConstructor
@@ -17,38 +20,65 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    /// Get all notifications
+    /**
+     * Retrieves all notifications for the authenticated user.
+     *
+     * @return response entity containing a list of NotificationResponse DTOs
+     */
     @GetMapping
     public ResponseEntity<List<NotificationResponse>> getAll() {
         return ResponseEntity.ok(notificationService.getAll());
     }
 
-    /// Get unread notifications
+    /**
+     * Retrieves unread notifications for the authenticated user.
+     *
+     * @return response entity containing a list of unread NotificationResponse DTOs
+     */
     @GetMapping("/unread")
     public ResponseEntity<List<NotificationResponse>> getUnread() {
         return ResponseEntity.ok(notificationService.getUnread());
     }
 
-    /// Count unread
+    /**
+     * Counts the total number of unread notifications for the authenticated user.
+     *
+     * @return response entity containing a map with the unread count
+     */
     @GetMapping("/unread/count")
     public ResponseEntity<Map<String, Long>> countUnread() {
         return ResponseEntity.ok(Map.of("count", notificationService.countUnread()));
     }
 
-    /// Mark one as read
+    /**
+     * Marks a specific notification as read.
+     *
+     * @param notificationId the unique identifier of the notification
+     * @return response entity with no content
+     */
     @PutMapping("/{notificationId}/read")
     public ResponseEntity<Void> markAsRead(@PathVariable UUID notificationId) {
         notificationService.markAsRead(notificationId);
         return ResponseEntity.noContent().build();
     }
 
-    /// Mark all as read
+    /**
+     * Marks all unread notifications for the authenticated user as read.
+     *
+     * @return response entity with no content
+     */
     @PutMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead() {
         notificationService.markAllAsRead();
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Deletes a specific notification.
+     *
+     * @param notificationId the unique identifier of the notification to delete
+     * @return response entity with no content
+     */
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Void> delete(@PathVariable UUID notificationId) {
         notificationService.delete(notificationId);

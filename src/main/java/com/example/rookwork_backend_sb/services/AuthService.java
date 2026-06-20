@@ -20,8 +20,12 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
+/**
+ * Service class handling user authentication, registration, and token refresh logic.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -31,8 +35,17 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Authenticates a user with email and password, and returns access and refresh tokens.
+     *
+     * @param dto the login request credentials
+     * @return the authentication response containing tokens
+     * @throws UnauthorizedException if credentials are invalid
+     * @throws ResourceNotFoundException if user doesn't exist
+     */
     public AuthResponse login(LoginRequest dto) {
         try {
+            // Authenticate user credentials via Spring Security
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             dto.getEmail(),
@@ -43,24 +56,34 @@ public class AuthService {
             throw new UnauthorizedException("Invalid email or password");
         }
 
+        // Fetch user from repository and generate authentication tokens
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return generateTokens(user);
     }
 
+    /**
+     * Registers a new user account if the email is not already in use.
+     *
+     * @param dto the registration details
+     * @return the authentication response containing tokens for the new user
+     * @throws ConflictException if the email is already registered
+     */
     public AuthResponse register(AuthRegister dto) {
+        // Prevent duplicate user registrations with the same email
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new ConflictException("Email already in use");
         }
 
+        // Build and persist the new active user entity with hashed password
         User user = User.builder()
                 .email(dto.getEmail())
                 .profileName(dto.getProfileName())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .isActive(true)
                 .isVerified(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
 
         userRepository.save(user);
@@ -68,12 +91,21 @@ public class AuthService {
         return generateTokens(user);
     }
 
+    /**
+     * Refreshes and returns new access/refresh tokens using a valid refresh token.
+     *
+     * @param refreshToken the plaintext refresh token
+     * @return the authentication response containing new tokens
+     * @throws UnauthorizedException if the token is invalid or expired
+     */
     public AuthResponse refresh(String refreshToken) {
+        // Retrieve the user matching the hashed refresh token
         User user = userRepository.findByRefreshTokenHash(
                         hashToken(refreshToken))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
-        if (user.getRefreshTokenExpiresAt().isBefore(LocalDateTime.now())) {
+        // Validate that the refresh token is still within its expiration window
+        if (user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
             throw new UnauthorizedException("Refresh token expired");
         }
 
@@ -102,7 +134,7 @@ public class AuthService {
         String accessToken = jwtService.generateToken(user.getId());
         String refreshToken = jwtService.generateRefreshToken();
         user.setRefreshTokenHash(hashToken(refreshToken));
-        user.setRefreshTokenExpiresAt(LocalDateTime.now().plusDays(7));
+        user.setRefreshTokenExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
         userRepository.save(user);
         return new AuthResponse(accessToken, refreshToken);
     }

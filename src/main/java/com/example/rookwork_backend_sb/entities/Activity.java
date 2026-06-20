@@ -5,8 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Type;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
+
 
 @Builder
 @Getter
@@ -51,5 +52,5 @@ public class Activity {
     private String metadata; // lưu JSON string, parse ở service layer
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

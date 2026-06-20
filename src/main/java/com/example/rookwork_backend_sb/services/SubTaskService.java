@@ -13,10 +13,13 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Service class handling operations on subtasks, including creation, status updates, deletion, and queries.
+ */
 @Service
 @RequiredArgsConstructor
 public class SubTaskService {
@@ -29,11 +32,22 @@ public class SubTaskService {
     private final ActivityService activityService;
     private final SecurityUtil securityUtil;
 
-    /// Create subtask
+    /**
+     * Creates a new subtask under a specified issue.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the parent issue
+     * @param request the subtask details
+     * @return the created SubTaskResponse DTO
+     * @throws ForbiddenException if the user is not a project member
+     * @throws UnauthorizedException if the user is not authenticated
+     * @throws ResourceNotFoundException if the project or issue is not found
+     */
     @Transactional
     public SubTaskResponse createSubTask(UUID projectId, UUID issueId, CreateSubTaskRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Check project membership
         if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -51,12 +65,13 @@ public class SubTaskService {
                 .subtaskDescription(request.getSubtaskDescription())
                 .isDone(false)
                 .issue(issue)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
 
         subTaskRepository.save(subTask);
 
+        // Log subtask creation activity
         activityService.log(
                 project,
                 currentUser,
@@ -71,11 +86,22 @@ public class SubTaskService {
         return toResponse(subTask);
     }
 
-    /// Update subtask
+    /**
+     * Updates an existing subtask's fields (name, description, completion status).
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the parent issue
+     * @param subtaskId the unique identifier of the subtask
+     * @param request the fields to update
+     * @return the updated SubTaskResponse DTO
+     * @throws ForbiddenException if the user is not a project member
+     * @throws ResourceNotFoundException if the project, issue, or subtask is not found
+     */
     @Transactional
     public SubTaskResponse updateSubTask(UUID projectId, UUID issueId, UUID subtaskId, UpdateSubTaskRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
+        // Check project membership
         if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
             throw new ForbiddenException("Not a member of this project");
 
@@ -91,6 +117,7 @@ public class SubTaskService {
         SubTask subTask = subTaskRepository.findByIdAndIssueId(subtaskId, issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));
 
+        // Conditionally update and log modified fields
         if (request.getSubtaskName() != null) {
             subTask.setSubtaskName(request.getSubtaskName());
             activityService.log(project, currentUser,
@@ -119,13 +146,21 @@ public class SubTaskService {
             );
         }
 
-        subTask.setUpdatedAt(LocalDateTime.now());
+        subTask.setUpdatedAt(Instant.now());
         subTaskRepository.save(subTask);
 
         return toResponse(subTask);
     }
 
-    /// Delete subtask
+    /**
+     * Deletes a subtask. Only allowed for project OWNERs.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the parent issue
+     * @param subtaskId the unique identifier of the subtask to delete
+     * @throws ForbiddenException if user is not a project member or is not the project owner
+     * @throws ResourceNotFoundException if the project, issue, or subtask is not found
+     */
     public void deleteSubTask(UUID projectId, UUID issueId, UUID subtaskId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -133,6 +168,7 @@ public class SubTaskService {
                 .findById(new ProjectMemberId(currentUserId, projectId))
                 .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
+        // Verify the user is authorized to delete subtasks
         if (member.getRole() != ProjectRole.OWNER)
             throw new ForbiddenException("Only OWNER can delete subtask");
 
@@ -148,6 +184,7 @@ public class SubTaskService {
         SubTask subTask = subTaskRepository.findByIdAndIssueId(subtaskId, issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));
 
+        // Log subtask deletion
         activityService.log(
                 project,
                 currentUser,
@@ -161,7 +198,14 @@ public class SubTaskService {
         subTaskRepository.delete(subTask);
     }
 
-    /// Get subtasks by issue
+    /**
+     * Retrieves all subtasks belonging to a specific issue.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @return a list of SubTaskResponse DTOs
+     * @throws ForbiddenException if current user is not a member of the project
+     */
     public List<SubTaskResponse> getSubTasks(UUID projectId, UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 

@@ -2,8 +2,7 @@ package com.example.rookwork_backend_sb.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
-import java.util.Date;
+import java.time.Instant;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -26,13 +25,13 @@ public class Event {
     private String eventDescription;
 
     @Column(name="deadline")
-    private Date deadline;
+    private Instant deadline;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name="updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @ManyToOne
     @JoinColumn(name="user_id")

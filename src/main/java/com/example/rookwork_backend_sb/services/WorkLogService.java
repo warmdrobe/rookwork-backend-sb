@@ -15,6 +15,9 @@ import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Service class handling logging work hours on issues, segmenting work spans by day, and calculating stats.
+ */
 @Service
 @RequiredArgsConstructor
 public class WorkLogService {
@@ -24,7 +27,14 @@ public class WorkLogService {
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
 
-
+    /**
+     * Logs work hours. If the work span crosses day boundaries (UTC), it automatically splits into daily segments.
+     *
+     * @param request the log work details, including issue ID and duration span
+     * @return a list of created WorkLogResponse DTOs
+     * @throws ResourceNotFoundException if user or issue is not found
+     * @throws BadRequestException if timestamps are missing or endAt is before startAt
+     */
     public List<WorkLogResponse> logWork(LogWorkRequest request) {
         UUID userId = securityUtil.getCurrentUserId();
 
@@ -34,25 +44,26 @@ public class WorkLogService {
         Issue issue = issueRepository.findById(request.getIssueId())
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
-        LocalDateTime start = request.getStartAt();
-        LocalDateTime end = request.getEndAt();
-
-        if (start == null || end == null)
+        // Validate time inputs
+        if (request.getStartAt() == null || request.getEndAt() == null)
             throw new BadRequestException("startAt and endAt are required");
-        if (!end.isAfter(start))
+        if (!request.getEndAt().isAfter(request.getStartAt()))
             throw new BadRequestException("endAt must be after startAt");
 
-        // Split thành các segments theo từng ngày
+        LocalDateTime start = LocalDateTime.ofInstant(request.getStartAt(), ZoneOffset.UTC);
+        LocalDateTime end = LocalDateTime.ofInstant(request.getEndAt(), ZoneOffset.UTC);
+
+        // Split the work duration into segments by day
         List<WorkLog> logs = new ArrayList<>();
         LocalDateTime cursor = start;
 
         while (cursor.isBefore(end)) {
-            // Cuối ngày hiện tại (23:59:59.999...)
+            // Get end of the current day in UTC
             LocalDateTime dayEnd = cursor.toLocalDate().atTime(LocalTime.MAX);
-            // Segment kết thúc tại dayEnd hoặc end, tùy cái nào sớm hơn
+            // End the current segment at the earlier of end of day or total end time
             LocalDateTime segmentEnd = dayEnd.isBefore(end) ? dayEnd : end;
 
-            // Tính hours của segment này (tính theo phút để chính xác)
+            // Calculate duration in hours
             double minutes = Duration.between(cursor, segmentEnd).toSeconds() / 60.0;
             double hours = minutes / 60.0;
             BigDecimal hoursDecimal = BigDecimal.valueOf(hours).setScale(2, RoundingMode.HALF_UP);
@@ -62,14 +73,14 @@ public class WorkLogService {
                         .issue(issue)
                         .user(user)
                         .hours(hoursDecimal)
-                        .loggedAt(cursor.toLocalDate().atStartOfDay()) // lưu đầu ngày để group by ngày
+                        .loggedAt(cursor.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant()) // Store start of day in UTC
                         .note(request.getNote())
-                        .createdAt(LocalDateTime.now())
+                        .createdAt(Instant.now())
                         .build();
                 logs.add(log);
             }
 
-            // Sang ngày tiếp theo
+            // Advance cursor to the next day
             cursor = cursor.toLocalDate().plusDays(1).atStartOfDay();
         }
 
@@ -80,7 +91,12 @@ public class WorkLogService {
                 .collect(Collectors.toList());
     }
 
-    // Lấy tất cả work logs của một issue
+    /**
+     * Retrieves all work logs for a specific issue, ordered by logged date descending.
+     *
+     * @param issueId the unique identifier of the issue
+     * @return a list of WorkLogResponse DTOs
+     */
     public List<WorkLogResponse> getByIssue(UUID issueId) {
         return workLogRepository.findAllByIssue_IdOrderByLoggedAtDesc(issueId)
                 .stream()
@@ -88,6 +104,11 @@ public class WorkLogService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Aggregates weekly work stats (this week vs last week) for the current user.
+     *
+     * @return a WorkStatsResponse containing daily breakdown
+     */
     public WorkStatsResponse getWeeklyStats() {
         UUID userId = securityUtil.getCurrentUserId();
         LocalDate today = LocalDate.now();
@@ -103,6 +124,11 @@ public class WorkLogService {
                 .build();
     }
 
+    /**
+     * Aggregates monthly work stats (this year vs last year) for the current user.
+     *
+     * @return a WorkStatsResponse containing monthly breakdown
+     */
     public WorkStatsResponse getMonthlyStats() {
         UUID userId = securityUtil.getCurrentUserId();
         LocalDate today = LocalDate.now();
@@ -135,8 +161,8 @@ public class WorkLogService {
 
         List<Object[]> rows = workLogRepository.sumHoursByDay(
                 userId,
-                from.atStartOfDay(),
-                to.atTime(LocalTime.MAX)
+                from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
         );
         Map<LocalDate, BigDecimal> map = rows.stream()
                 .collect(Collectors.toMap(
@@ -161,8 +187,8 @@ public class WorkLogService {
 
         List<Object[]> rows = workLogRepository.sumHoursByDay(
                 userId,
-                from.atStartOfDay(),
-                to.atTime(LocalTime.MAX)
+                from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
         );
         Map<Month, BigDecimal> map = new EnumMap<>(Month.class);
         for (Object[] r : rows) {

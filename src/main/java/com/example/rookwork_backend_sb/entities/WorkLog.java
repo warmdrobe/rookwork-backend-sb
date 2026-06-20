@@ -3,7 +3,7 @@ package com.example.rookwork_backend_sb.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -32,11 +32,11 @@ public class WorkLog {
     private BigDecimal hours;
 
     @Column(name = "logged_at", nullable = false)
-    private LocalDateTime loggedAt;
+    private Instant loggedAt;
 
     @Column(columnDefinition = "text")
     private String note;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

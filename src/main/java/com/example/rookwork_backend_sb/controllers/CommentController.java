@@ -10,14 +10,23 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Controller exposing endpoints for comment CRUD operations under issues and projects.
+ */
 @RestController
-//@RequestMapping("api/comments")
 @RequestMapping("api/projects/{projectId}")
 @RequiredArgsConstructor
 public class CommentController {
     private final CommentService commentService;
 
-    /// Create comment
+    /**
+     * Creates a new comment under an issue.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param request the comment details payload
+     * @return response entity containing the created CommentResponse DTO
+     */
     @PostMapping("/issues/{issueId}/comments")
     public ResponseEntity<CommentResponse> createComment(
             @PathVariable UUID projectId,
@@ -26,7 +35,15 @@ public class CommentController {
         return ResponseEntity.ok(commentService.createComment(projectId, issueId, request));
     }
 
-    /// Update comment
+    /**
+     * Updates an existing comment.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param commentId the unique identifier of the comment to update
+     * @param request the updated comment content payload
+     * @return response entity containing the updated CommentResponse DTO
+     */
     @PutMapping("/issues/{issueId}/comments/{commentId}")
     public ResponseEntity<CommentResponse> updateComment(
             @PathVariable UUID projectId,
@@ -36,7 +53,14 @@ public class CommentController {
         return ResponseEntity.ok(commentService.updateComment(projectId, issueId, commentId, request));
     }
 
-    /// Delete comment
+    /**
+     * Deletes a comment.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param commentId the unique identifier of the comment to delete
+     * @return response entity with no content
+     */
     @DeleteMapping("/issues/{issueId}/comments/{commentId}")
     public ResponseEntity<Void> deleteComment(
             @PathVariable UUID projectId,
@@ -46,14 +70,24 @@ public class CommentController {
         return ResponseEntity.noContent().build();
     }
 
-    /// Get comment by project id
+    /**
+     * Retrieves all comments for a project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return response entity containing a list of CommentResponse DTOs
+     */
     @GetMapping("/comments")
     public ResponseEntity<List<CommentResponse>> getAllCommentByProjectId(
             @PathVariable UUID projectId) {
         return ResponseEntity.ok(commentService.getAllCommentByProjectId(projectId));
     }
 
-    /// Get comment by issue id
+    /**
+     * Retrieves all comments for an issue.
+     *
+     * @param issueId the unique identifier of the issue
+     * @return response entity containing a list of top-level CommentResponse DTOs (with nested replies)
+     */
     @GetMapping("/issues/{issueId}/comments")
     public ResponseEntity<List<CommentResponse>> getAllCommentByIssueId(
             @PathVariable UUID issueId) {

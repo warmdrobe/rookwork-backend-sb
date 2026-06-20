@@ -7,15 +7,29 @@ import lombok.AllArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Service class for tracking and logging project activity history.
+ */
 @AllArgsConstructor
 @Service
 public class ActivityService {
     private final ActivityRepository activityRepository;
-    /// Log mapping config
+
+    /**
+     * Logs a new activity entry to the database.
+     *
+     * @param project the project where the action occurred
+     * @param actor the user who performed the action
+     * @param action the type of action performed
+     * @param entityType the type of entity affected by the action
+     * @param entityId the unique identifier of the affected entity
+     * @param entityName the display name of the affected entity
+     * @param metadata additional JSON metadata associated with the action
+     */
     public void log (Project project, User actor,
                 ActivityAction action, ActivityEntityType entityType,
                 UUID entityId, String entityName,
@@ -28,11 +42,18 @@ public class ActivityService {
                 .entityId(entityId)
                 .entityName(entityName)
                 .metadata(metadata)
-                .createdAt(LocalDateTime.now())
+                .createdAt(Instant.now())
                 .build();
         activityRepository.save(activity);
     }
 
+    /**
+     * Retrieves recent raw activity logs for a project.
+     *
+     * @param projectId the unique identifier of the project
+     * @param limit the maximum number of activity logs to retrieve
+     * @return a list of activities matching the project sorted by creation date descending
+     */
     public List<Activity> getProjectActivities(UUID projectId, int limit) {
         return activityRepository.findByProjectIdOrderByCreatedAtDesc(
                 projectId, PageRequest.of(0, limit)
@@ -119,12 +140,27 @@ public class ActivityService {
     //    null
     //);
 
+    /**
+     * Retrieves recent activities for a project formatted as response DTOs.
+     *
+     * @param projectId the unique identifier of the project
+     * @param limit the maximum number of activities to retrieve
+     * @return a list of ActivityResponse DTOs
+     */
     public List<ActivityResponse> getProjectActivityResponses(UUID projectId, int limit) {
         return getProjectActivities(projectId, limit).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
+    /**
+     * Retrieves activity history specific to a given issue.
+     *
+     * @param projectId the unique identifier of the project
+     * @param issueId the unique identifier of the issue
+     * @param limit the maximum number of activity logs to retrieve
+     * @return a list of ActivityResponse DTOs related to the issue
+     */
     public List<ActivityResponse> getIssueActivity(UUID projectId, UUID issueId, int limit) {
         return activityRepository
                 .findIssueActivities(projectId, issueId, PageRequest.of(0, limit))

@@ -2,7 +2,7 @@ package com.example.rookwork_backend_sb.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -58,13 +58,13 @@ public class Issue {
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     private List<Issue> children = new ArrayList<>();
 
-    private LocalDateTime deadline;
+    private Instant deadline;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
 
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comment> comments = new ArrayList<>();

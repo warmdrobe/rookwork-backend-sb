@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.entities;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,10 +25,10 @@ public class Project {
     private boolean isPrivate = true;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name="updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
