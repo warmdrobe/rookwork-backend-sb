@@ -3,21 +3,25 @@ package com.example.rookwork_backend_sb.services;
 import com.example.rookwork_backend_sb.dtos.activities.ActivityResponse;
 import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.repositories.ActivityRepository;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
  * Service class for tracking and logging project activity history.
  */
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
 public class ActivityService {
     private final ActivityRepository activityRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Logs a new activity entry to the database.
@@ -33,7 +37,15 @@ public class ActivityService {
     public void log (Project project, User actor,
                 ActivityAction action, ActivityEntityType entityType,
                 UUID entityId, String entityName,
-                String metadata){
+                Map<String, Object> metadata){
+        String metadataJson = null;
+        if (metadata != null) {
+            try {
+                metadataJson = objectMapper.writeValueAsString(metadata);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("Failed to serialize activity metadata", e);
+            }
+        }
         Activity activity = Activity.builder()
                 .project(project)
                 .actor(actor)
@@ -41,7 +53,7 @@ public class ActivityService {
                 .entityType(entityType)
                 .entityId(entityId)
                 .entityName(entityName)
-                .metadata(metadata)
+                .metadata(metadataJson)
                 .createdAt(Instant.now())
                 .build();
         activityRepository.save(activity);

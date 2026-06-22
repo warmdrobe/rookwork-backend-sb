@@ -88,10 +88,9 @@ public class CommentService {
                 ActivityEntityType.COMMENT,
                 comment.getId(),
                 issue.getIssueName(),
-                String.format("{\"preview\":\"%s\"}",
-                        comment.getContent().length() > 50
-                                ? comment.getContent().substring(0, 50) + "..."
-                                : comment.getContent())
+                Map.of("preview", comment.getContent().length() > 50
+                        ? comment.getContent().substring(0, 50) + "..."
+                        : comment.getContent())
         );
 
         CommentResponse response = CommentResponse.builder()

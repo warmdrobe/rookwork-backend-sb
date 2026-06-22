@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -79,8 +80,7 @@ public class SubTaskService {
                 ActivityEntityType.SUBTASK,
                 subTask.getId(),
                 subTask.getSubtaskName(),
-                String.format("{\"issueId\":\"%s\",\"issueName\":\"%s\"}",
-                        issue.getId(), issue.getIssueName())
+                Map.of("issueId", issue.getId().toString(), "issueName", issue.getIssueName())
         );
 
         return toResponse(subTask);
@@ -123,7 +123,7 @@ public class SubTaskService {
             activityService.log(project, currentUser,
                     ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
-                    String.format("{\"field\":\"name\",\"to\":\"%s\"}", request.getSubtaskName())
+                    Map.of("field", "name", "to", request.getSubtaskName())
             );
         }
 
@@ -132,7 +132,7 @@ public class SubTaskService {
             activityService.log(project, currentUser,
                     ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
-                    String.format("{\"field\":\"description\",\"to\":\"%s\"}", request.getSubtaskDescription())
+                    Map.of("field", "description", "to", request.getSubtaskDescription())
             );
         }
 
@@ -142,7 +142,7 @@ public class SubTaskService {
                     request.getIsDone() ? ActivityAction.COMPLETED : ActivityAction.UPDATED,
                     ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
-                    String.format("{\"field\":\"isDone\",\"to\":\"%s\"}", request.getIsDone())
+                    Map.of("field", "isDone", "to", request.getIsDone().toString())
             );
         }
 

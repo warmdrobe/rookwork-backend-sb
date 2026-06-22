@@ -183,9 +183,10 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    String.format("{\"assigned_to_id\":\"%s\",\"assigned_to_name\":\"%s\"}",
-                            assignee.getId(),
-                            assignee.getProfileName())
+                    Map.of(
+                            "assigned_to_id", assignee.getId().toString(),
+                            "assigned_to_name", assignee.getProfileName()
+                    )
             );
 
             Notification notification = Notification.builder()
@@ -236,7 +237,7 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
-                        String.format("{\"from\":\"%s\",\"to\":\"%s\"}", oldStatus, request.getStatus())
+                        Map.of("from", oldStatus.name(), "to", request.getStatus().name())
                 );
             }
         }
@@ -249,7 +250,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    String.format("{\"field\":\"priority\",\"to\":\"%s\"}", request.getPriority())
+                    Map.of("field", "priority", "to", request.getPriority().name())
             );
         }
 
@@ -260,7 +261,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    String.format("{\"field\":\"name\",\"to\":\"%s\"}", request.getIssueName())
+                    Map.of("field", "name", "to", request.getIssueName())
             );
         }
 
@@ -271,7 +272,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    String.format("{\"field\":\"description\",\"to\":\"%s\"}", request.getDescription())
+                    Map.of("field", "description", "to", request.getDescription())
             );
         }
 
@@ -282,7 +283,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    String.format("{\"field\":\"deadline\",\"to\":\"%s\"}", request.getDeadline())
+                    Map.of("field", "deadline", "to", request.getDeadline().toString())
             );
         }
 
