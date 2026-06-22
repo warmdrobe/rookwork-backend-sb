@@ -3,6 +3,7 @@ package com.example.rookwork_backend_sb.controllers;
 import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
 import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
 import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.dtos.auth.RefreshRequest;
 import com.example.rookwork_backend_sb.services.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,17 @@ public class AuthController {
   @PostMapping("/login")
   public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
     return ResponseEntity.ok(authService.login(request));
+  }
+
+  /**
+   * Authenticates a Google ID token and issues tokens.
+   *
+   * @param request the Google login request containing the ID token
+   * @return response entity containing access and refresh tokens
+   */
+  @PostMapping("/google")
+  public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleLoginRequest request) {
+    return ResponseEntity.ok(authService.googleLogin(request));
   }
 
   /**
