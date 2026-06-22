@@ -3,13 +3,16 @@ package com.example.rookwork_backend_sb.services;
 import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
 import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
 import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.AppException;
 import com.example.rookwork_backend_sb.exceptions.ConflictException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,11 +20,16 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 
 /**
  * Service class handling user authentication, registration, and token refresh logic.
@@ -34,6 +42,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${google.client-id:#{null}}")
+    private String googleClientId;
 
     /**
      * Authenticates a user with email and password, and returns access and refresh tokens.
@@ -138,4 +150,79 @@ public class AuthService {
         userRepository.save(user);
         return new AuthResponse(accessToken, refreshToken);
     }
+
+    public AuthResponse googleLogin(GoogleLoginRequest dto) {
+        Map<String, Object> payload = verifyGoogleToken(dto.getToken());
+
+        String email = (String) payload.get("email");
+        String name = (String) payload.get("name");
+        String picture = (String) payload.get("picture");
+
+        if (email == null || email.trim().isEmpty()) {
+            throw new UnauthorizedException("Google token does not contain email");
+        }
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = User.builder()
+                    .email(email)
+                    .profileName(name != null ? name : email.split("@")[0])
+                    .picture(picture)
+                    .passwordHash(null)
+                    .isActive(true)
+                    .isVerified(true)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            return userRepository.save(newUser);
+        });
+
+        boolean updated = false;
+        if (user.getPicture() == null && picture != null) {
+            user.setPicture(picture);
+            updated = true;
+        }
+        if ((user.getProfileName() == null || user.getProfileName().isEmpty()) && name != null) {
+            user.setProfileName(name);
+            updated = true;
+        }
+        if (updated) {
+            user.setUpdatedAt(Instant.now());
+            userRepository.save(user);
+        }
+
+        return generateTokens(user);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> verifyGoogleToken(String idToken) {
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new UnauthorizedException("Invalid Google token");
+            }
+
+            Map<String, Object> payload = objectMapper.readValue(response.body(), Map.class);
+
+            if (googleClientId != null && !googleClientId.trim().isEmpty()) {
+                String aud = (String) payload.get("aud");
+                if (!googleClientId.equals(aud)) {
+                    throw new UnauthorizedException("Google token audience mismatch");
+                }
+            }
+
+            return payload;
+        } catch (Exception e) {
+            if (e instanceof UnauthorizedException) {
+                throw (UnauthorizedException) e;
+            }
+            throw new UnauthorizedException("Failed to verify Google token: " + e.getMessage());
+        }
+    }
 }
+
