@@ -16,7 +16,7 @@ public interface ActivityRepository extends JpaRepository<Activity, UUID> {
 
   List<Activity> findByActorIdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
 
-  @Query("SELECT a FROM Activity a WHERE a.project.id = :projectId AND a.entityId = :issueId AND a.entityType = 'ISSUE' ORDER BY a.createdAt DESC")
+  @Query("SELECT a FROM Activity a WHERE a.project.id = :projectId AND a.issue.id = :issueId ORDER BY a.createdAt DESC")
   List<Activity> findIssueActivities(
       @Param("projectId") UUID projectId,
       @Param("issueId") UUID issueId,
