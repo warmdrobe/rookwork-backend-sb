@@ -83,6 +83,7 @@ public class IssueService {
                 ActivityEntityType.ISSUE,
                 issue.getId(),
                 issue.getIssueName(),
+                issue,
                 null
         );
 
@@ -183,6 +184,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
+                    issue,
                     Map.of(
                             "assigned_to_id", assignee.getId().toString(),
                             "assigned_to_name", assignee.getProfileName()
@@ -228,6 +230,7 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
+                        issue,
                         null
                 );
             } else {
@@ -237,6 +240,7 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
+                        issue,
                         Map.of("from", oldStatus.name(), "to", request.getStatus().name())
                 );
             }
@@ -250,6 +254,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
+                    issue,
                     Map.of("field", "priority", "to", request.getPriority().name())
             );
         }
@@ -261,6 +266,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
+                    issue,
                     Map.of("field", "name", "to", request.getIssueName())
             );
         }
@@ -272,6 +278,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
+                    issue,
                     Map.of("field", "description", "to", request.getDescription())
             );
         }
@@ -283,6 +290,7 @@ public class IssueService {
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
+                    issue,
                     Map.of("field", "deadline", "to", request.getDeadline().toString())
             );
         }
@@ -298,6 +306,7 @@ public class IssueService {
      * @throws ForbiddenException if current user is not a member or not the project owner
      * @throws ResourceNotFoundException if the issue is not found
      */
+    @Transactional
     public void deleteIssue(UUID projectId, UUID issueId) {
 
         UUID currentUserId = securityUtil.getCurrentUserId();
@@ -314,6 +323,21 @@ public class IssueService {
         Issue issue = issueRepository
                 .findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log issue deletion activity (passing null for issue to prevent ON DELETE CASCADE from removing the log)
+        activityService.log(
+                issue.getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.ISSUE,
+                issue.getId(),
+                issue.getIssueName(),
+                null,
+                null
+        );
 
         issueRepository.delete(issue);
     }
