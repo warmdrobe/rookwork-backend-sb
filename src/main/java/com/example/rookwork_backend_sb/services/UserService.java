@@ -6,7 +6,7 @@ import com.example.rookwork_backend_sb.dtos.user.UpdatePreferencesRequest;
 import com.example.rookwork_backend_sb.dtos.user.UpdateProfileRequest;
 import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -83,7 +83,7 @@ public class UserService {
         // Google auth users might not have a password
         if (user.getPasswordHash() != null) {
             if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-                throw new UnauthorizedException("Incorrect current password");
+                throw new BadRequestException("Incorrect current password");
             }
         }
         
@@ -95,5 +95,15 @@ public class UserService {
     private User getUserOrThrow(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    public void deleteAccount(UUID userId, com.example.rookwork_backend_sb.dtos.user.DeleteAccountRequest request) {
+        User user = getUserOrThrow(userId);
+        if (user.getPasswordHash() != null) {
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                throw new BadRequestException("Incorrect password");
+            }
+        }
+        userRepository.delete(user);
     }
 }

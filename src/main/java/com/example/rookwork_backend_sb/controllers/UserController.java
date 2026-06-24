@@ -91,4 +91,11 @@ public class UserController {
     userService.updatePassword(userId, request);
     return ResponseEntity.noContent().build();
   }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/me")
+  public ResponseEntity<Void> deleteAccount(@RequestBody com.example.rookwork_backend_sb.dtos.user.DeleteAccountRequest request) {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.deleteAccount(userId, request);
+    return ResponseEntity.noContent().build();
+  }
 }

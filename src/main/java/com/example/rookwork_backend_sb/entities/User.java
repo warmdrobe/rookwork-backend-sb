@@ -8,6 +8,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Setter
@@ -15,6 +18,8 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name="users")
+@SQLDelete(sql = "UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
 public class User {
 
     @Id
@@ -51,6 +56,9 @@ public class User {
 
     @Column(name="updated_at")
     private Instant updatedAt;
+
+    @Column(name="deleted_at")
+    private Instant deletedAt;
 
     @Column(name="job_title")
     private String jobTitle;

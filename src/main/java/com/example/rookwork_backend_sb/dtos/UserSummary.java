@@ -26,7 +26,7 @@ public class UserSummary {
     public boolean jobTitlePublic;
     public boolean organizationPublic;
     public boolean locationPublic;
-    public Boolean notifyIssueAssigned;
+    public boolean notifyIssueAssigned;
     public boolean notifyMentioned;
     public boolean notifyProjectUpdates;
     public boolean notifyDailyDigest;
