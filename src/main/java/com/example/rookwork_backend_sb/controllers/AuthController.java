@@ -70,4 +70,15 @@ public class AuthController {
       return ResponseEntity.status(500).body(e.getMessage());
     }
   }
+
+  /**
+   * Checks if an email is already registered in the system.
+   *
+   * @param email the email to check
+   * @return true if the email exists, false otherwise
+   */
+  @org.springframework.web.bind.annotation.GetMapping("/check-email")
+  public ResponseEntity<Boolean> checkEmail(@org.springframework.web.bind.annotation.RequestParam String email) {
+    return ResponseEntity.ok(authService.checkEmailExists(email));
+  }
 }

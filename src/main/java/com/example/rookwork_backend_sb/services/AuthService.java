@@ -74,16 +74,24 @@ public class AuthService {
         return generateTokens(user);
     }
 
+    public boolean checkEmailExists(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
+
     /**
      * Registers a new user account if the email is not already in use.
      *
      * @param dto the registration details
      * @return the authentication response containing tokens for the new user
-     * @throws ConflictException if the email is already registered
+     * @throws ConflictException if the email is already registered or invalid format
      */
     public AuthResponse register(AuthRegister dto) {
+        if (!dto.getEmail().matches("^[a-zA-Z0-9._%+-]+@gmail\\.com$")) {
+            throw new ConflictException("Chỉ chấp nhận email định dạng @gmail.com");
+        }
+
         // Prevent duplicate user registrations with the same email
-        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
+        if (checkEmailExists(dto.getEmail())) {
             throw new ConflictException("Email already in use");
         }
 
