@@ -47,9 +47,13 @@ public class Issue {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_to")
-    private User assignedTo;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "issue_assignees",
+        joinColumns = @JoinColumn(name = "issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private List<User> assignees = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

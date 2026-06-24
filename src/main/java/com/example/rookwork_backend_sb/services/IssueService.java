@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,13 +121,15 @@ public class IssueService {
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
         Status oldStatus = issue.getStatus();
-        UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
+        List<UUID> oldAssigneeIds = issue.getAssignees().stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
 
         boolean nameChanged = false;
         boolean descriptionChanged = false;
         boolean priorityChanged = false;
         boolean deadlineChanged = false;
-        boolean assigneeChanged = false;
+        boolean assigneesChanged = false;
         boolean statusChanged = false;
         boolean parentChanged = false;
 
@@ -192,17 +195,20 @@ public class IssueService {
             }
         }
 
-        if (request.getAssignedToId() != null) {
-            UUID newAssigneeId = request.getAssignedToId();
-            if (newAssigneeId == null ? oldAssigneeId != null : !newAssigneeId.equals(oldAssigneeId)) {
-                if (newAssigneeId != null) {
-                    User assignee = userRepository.findById(newAssigneeId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
-                    issue.setAssignedTo(assignee);
-                } else {
-                    issue.setAssignedTo(null);
+        if (request.getAssigneeIds() != null) {
+            List<UUID> newIds = request.getAssigneeIds();
+            List<UUID> currentIds = issue.getAssignees().stream()
+                    .map(User::getId)
+                    .collect(Collectors.toList());
+            if (!newIds.equals(currentIds)) {
+                List<User> newAssignees = new ArrayList<>();
+                for (UUID uid : newIds) {
+                    User assignee = userRepository.findById(uid)
+                            .orElseThrow(() -> new ResourceNotFoundException("Assignee not found: " + uid));
+                    newAssignees.add(assignee);
                 }
-                assigneeChanged = true;
+                issue.setAssignees(newAssignees);
+                assigneesChanged = true;
             }
         }
 
@@ -214,7 +220,7 @@ public class IssueService {
             }
         }
 
-        boolean isAnyFieldChanged = nameChanged || descriptionChanged || priorityChanged || deadlineChanged || assigneeChanged || statusChanged || parentChanged;
+        boolean isAnyFieldChanged = nameChanged || descriptionChanged || priorityChanged || deadlineChanged || assigneesChanged || statusChanged || parentChanged;
 
         if (isAnyFieldChanged) {
             issue.setUpdatedAt(Instant.now());
@@ -228,51 +234,54 @@ public class IssueService {
             messagingTemplate.convertAndSend(dest, (Object) payload);
         }
 
-        // Handle assignee change activity log and push notifications
-        if (assigneeChanged) {
-            if (issue.getAssignedTo() != null) {
-                User assignee = issue.getAssignedTo();
-                if (!assignee.getId().equals(currentUserId)) {
-                    activityService.log(
-                            project, currentUser,
-                            ActivityAction.ASSIGNED,
-                            ActivityEntityType.ISSUE,
-                            issue.getId(),
-                            issue.getIssueName(),
-                            Map.of(
-                                    "assigned_to_id", assignee.getId().toString(),
-                                    "assigned_to_name", assignee.getProfileName()
-                            )
-                    );
+        // Handle assignees change activity log and push notifications
+        if (assigneesChanged) {
+            List<User> currentAssignees = issue.getAssignees();
+            if (!currentAssignees.isEmpty()) {
+                // Notify newly added assignees (not in old list)
+                for (User assignee : currentAssignees) {
+                    if (!oldAssigneeIds.contains(assignee.getId()) && !assignee.getId().equals(currentUserId)) {
+                        activityService.log(
+                                project, currentUser,
+                                ActivityAction.ASSIGNED,
+                                ActivityEntityType.ISSUE,
+                                issue.getId(),
+                                issue.getIssueName(),
+                                Map.of(
+                                        "assigned_to_id", assignee.getId().toString(),
+                                        "assigned_to_name", assignee.getProfileName()
+                                )
+                        );
 
-                    Notification notification = Notification.builder()
-                            .user(assignee)
-                            .sender(currentUser)
-                            .issue(issue)
-                            .title("You have been assigned to an issue")
-                            .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
-                                    currentUser.getProfileName(),
-                                    issue.getIssueName(),
-                                    project.getProjectName()))
-                            .isRead(false)
-                            .createdAt(Instant.now())
-                            .updatedAt(Instant.now())
-                            .build();
+                        Notification notification = Notification.builder()
+                                .user(assignee)
+                                .sender(currentUser)
+                                .issue(issue)
+                                .title("You have been assigned to an issue")
+                                .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
+                                        currentUser.getProfileName(),
+                                        issue.getIssueName(),
+                                        project.getProjectName()))
+                                .isRead(false)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .build();
 
-                    notificationRepository.save(notification);
+                        notificationRepository.save(notification);
 
-                    messagingTemplate.convertAndSendToUser(
-                            assignee.getId().toString(),
-                            "/queue/notifications",
-                            Map.of(
-                                    "type", "ASSIGNED",
-                                    "notificationId", notification.getId(),
-                                    "issueId", issue.getId(),
-                                    "issueName", issue.getIssueName(),
-                                    "projectName", project.getProjectName(),
-                                    "assignedBy", currentUser.getProfileName()
-                            )
-                    );
+                        messagingTemplate.convertAndSendToUser(
+                                assignee.getId().toString(),
+                                "/queue/notifications",
+                                Map.of(
+                                        "type", "ASSIGNED",
+                                        "notificationId", notification.getId(),
+                                        "issueId", issue.getId(),
+                                        "issueName", issue.getIssueName(),
+                                        "projectName", project.getProjectName(),
+                                        "assignedBy", currentUser.getProfileName()
+                                )
+                        );
+                    }
                 }
             } else {
                 activityService.log(
@@ -281,7 +290,7 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
-                        Map.of("field", "assignee", "to", "Unassigned")
+                        Map.of("field", "assignees", "to", "Unassigned")
                 );
             }
         }
@@ -438,7 +447,7 @@ public class IssueService {
      */
     public List<IssueResponse> getAllByAssignedToId() {
         UUID currentUserId = securityUtil.getCurrentUserId();
-        return issueRepository.findAllByAssignedToId(currentUserId)
+        return issueRepository.findAllByAssigneeId(currentUserId)
                 .stream()
                 .map(issue -> getIssueResponse(issue.getProject().getId(), issue))
                 .collect(Collectors.toList());
@@ -473,13 +482,14 @@ public class IssueService {
         response.setCreatedAt(issue.getCreatedAt());
         response.setUpdatedAt(issue.getUpdatedAt());
 
-        if (issue.getAssignedTo() != null) {
-            UserSummary assignee = new UserSummary();
-            assignee.setId(issue.getAssignedTo().getId());
-            assignee.setProfileName(issue.getAssignedTo().getProfileName());
-            assignee.setPicture(issue.getAssignedTo().getPicture());
-            response.setAssignedTo(assignee);
-        }
+        List<UserSummary> assignees = issue.getAssignees().stream().map(u -> {
+            UserSummary s = new UserSummary();
+            s.setId(u.getId());
+            s.setProfileName(u.getProfileName());
+            s.setPicture(u.getPicture());
+            return s;
+        }).collect(Collectors.toList());
+        response.setAssignees(assignees);
 
         return response;
     }

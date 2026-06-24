@@ -8,14 +8,18 @@ import java.util.UUID;
 
 import com.example.rookwork_backend_sb.entities.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface IssueRepository extends JpaRepository<Issue, UUID> {
     Optional<Issue> findById(UUID id);
     List<Issue> findAllByProjectId(UUID projectId);
-    List<Issue> findAllByAssignedToId(UUID userId);
     Optional<Issue> findByIdAndProjectId(UUID id, UUID projectId);
+
+    @Query("SELECT i FROM Issue i JOIN i.assignees u WHERE u.id = :userId")
+    List<Issue> findAllByAssigneeId(@Param("userId") UUID userId);
 
     //process
     long countByProjectId(UUID projectId);
