@@ -127,6 +127,10 @@ public class IssueService {
             issue.setIssueName(request.getIssueName());
         }
 
+        if (request.getIssueType() != null) {
+            issue.setIssueType(request.getIssueType());
+        }
+
         if (request.getDescription() != null) {
             issue.setDescription(request.getDescription());
         }
