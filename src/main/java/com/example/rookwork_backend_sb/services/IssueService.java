@@ -142,6 +142,10 @@ public class IssueService {
             }
         }
 
+        if (request.getIssueType() != null) {
+            issue.setIssueType(request.getIssueType());
+        }
+
         if (request.getDescription() != null) {
             String newDesc = request.getDescription();
             String oldDesc = issue.getDescription();
