@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,7 +18,8 @@ public class UpdateIssueRequest {
     public IssueType issueType;
     public PriorityType priority;
     public LocalDate deadline;
-    public UUID assignedToId;
+    /** null = không thay đổi, [] = xóa hết assignee, [id1,id2] = set mới */
+    public List<UUID> assigneeIds;
     public Status status;
     public UUID parentId;
 }

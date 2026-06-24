@@ -26,7 +26,7 @@ public class WorkLogService {
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
-
+    
     /**
      * Logs work hours. If the work span crosses day boundaries (UTC), it automatically splits into daily segments.
      *
@@ -39,9 +39,14 @@ public class WorkLogService {
         Issue issue = issueRepository.findById(request.getIssueId())
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
-        User user = issue.getAssignedTo();
-        if (user == null) {
-            throw new BadRequestException("Cannot log work on an unassigned issue");
+        UUID currentUserId = securityUtil.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean isAssignee = issue.getAssignees().stream()
+                .anyMatch(u -> u.getId().equals(currentUserId));
+        if (!isAssignee) {
+            throw new BadRequestException("You can only log work on an issue assigned to you");
         }
 
         // Validate time inputs
@@ -71,7 +76,7 @@ public class WorkLogService {
             if (hoursDecimal.compareTo(BigDecimal.ZERO) > 0) {
                 WorkLog log = WorkLog.builder()
                         .issue(issue)
-                        .user(user)
+                        .user(currentUser)
                         .hours(hoursDecimal)
                         .loggedAt(cursor.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant()) // Store start of day in UTC
                         .note(request.getNote())
