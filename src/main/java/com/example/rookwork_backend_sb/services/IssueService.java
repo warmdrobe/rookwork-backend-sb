@@ -130,18 +130,18 @@ public class IssueService {
         boolean parentChanged = false;
 
         // Conditionally update updated fields
-        if (request.isDirty("issueName")) {
-            String newName = request.getIssueName();
-            if (newName == null || newName.trim().isEmpty()) {
+        if (request.getIssueName() != null) {
+            if (request.getIssueName().trim().isEmpty()) {
                 throw new BadRequestException("Issue name cannot be empty");
             }
+            String newName = request.getIssueName();
             if (!newName.equals(issue.getIssueName())) {
                 issue.setIssueName(newName);
                 nameChanged = true;
             }
         }
 
-        if (request.isDirty("description")) {
+        if (request.getDescription() != null) {
             String newDesc = request.getDescription();
             String oldDesc = issue.getDescription();
             if (oldDesc == null ? newDesc != null : !oldDesc.equals(newDesc)) {
@@ -150,7 +150,7 @@ public class IssueService {
             }
         }
 
-        if (request.isDirty("priority")) {
+        if (request.getPriority() != null) {
             PriorityType newPriority = request.getPriority();
             if (newPriority != issue.getPriority()) {
                 issue.setPriority(newPriority);
@@ -158,8 +158,8 @@ public class IssueService {
             }
         }
 
-        if (request.isDirty("deadline")) {
-            Instant newDeadline = request.getDeadline() != null ? request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant() : null;
+        if (request.getDeadline() != null) {
+            Instant newDeadline = request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant();
             Instant oldDeadline = issue.getDeadline();
             if (oldDeadline == null ? newDeadline != null : !oldDeadline.equals(newDeadline)) {
                 issue.setDeadline(newDeadline);
@@ -168,7 +168,7 @@ public class IssueService {
         }
 
         // Parent issue validation
-        if (request.isDirty("parentId")) {
+        if (request.getParentId() != null) {
             UUID newParentId = request.getParentId();
             UUID oldParentId = issue.getParent() != null ? issue.getParent().getId() : null;
             if (newParentId == null ? oldParentId != null : !newParentId.equals(oldParentId)) {
@@ -187,7 +187,7 @@ public class IssueService {
             }
         }
 
-        if (request.isDirty("assignedToId")) {
+        if (request.getAssignedToId() != null) {
             UUID newAssigneeId = request.getAssignedToId();
             if (newAssigneeId == null ? oldAssigneeId != null : !newAssigneeId.equals(oldAssigneeId)) {
                 if (newAssigneeId != null) {
@@ -201,7 +201,7 @@ public class IssueService {
             }
         }
 
-        if (request.isDirty("status")) {
+        if (request.getStatus() != null) {
             Status newStatus = request.getStatus();
             if (newStatus != oldStatus) {
                 issue.setStatus(newStatus);
