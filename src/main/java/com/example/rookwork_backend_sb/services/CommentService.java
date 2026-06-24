@@ -88,6 +88,7 @@ public class CommentService {
                 ActivityEntityType.COMMENT,
                 comment.getId(),
                 issue.getIssueName(),
+                issue,
                 Map.of("preview", comment.getContent().length() > 50
                         ? comment.getContent().substring(0, 50) + "..."
                         : comment.getContent())
@@ -117,46 +118,45 @@ public class CommentService {
                 (Object) payload
         );
 
-        // Notify the issue assignee if the comment was written by someone else
-        if (issue.getAssignedTo() != null &&
-                !issue.getAssignedTo().getId().equals(currentUserId)) {
+        // Notify each assignee if the comment was written by someone else
+        for (User assignee : issue.getAssignees()) {
+            if (!assignee.getId().equals(currentUserId)) {
+                Notification notification = Notification.builder()
+                        .user(assignee)
+                        .sender(currentUser)
+                        .issue(issue)
+                        .title("New comment on your issue")
+                        .message(String.format("%s commented on \"%s\" in project \"%s\"",
+                                 currentUser.getProfileName(),
+                                 issue.getIssueName(),
+                                 project.getProjectName()))
+                        .isRead(false)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                notificationRepository.save(notification);
 
-            User assignee = issue.getAssignedTo();
-
-            Notification notification = Notification.builder()
-                    .user(assignee)
-                    .sender(currentUser)
-                    .issue(issue)
-                    .title("New comment on your issue")
-                    .message(String.format("%s commented on \"%s\" in project \"%s\"",
-                             currentUser.getProfileName(),
-                             issue.getIssueName(),
-                             project.getProjectName()))
-                    .isRead(false)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            notificationRepository.save(notification);
-
-            simpMessagingTemplate.convertAndSendToUser(
-                    assignee.getId().toString(),
-                    "/queue/notifications",
-                    Map.of(
-                            "type", "NEW_COMMENT",
-                            "notificationId", notification.getId(),
-                            "issueId", issue.getId(),
-                            "issueName", issue.getIssueName(),
-                            "projectName", project.getProjectName(),
-                            "commentBy", currentUser.getProfileName()
-                    )
-            );
+                simpMessagingTemplate.convertAndSendToUser(
+                        assignee.getId().toString(),
+                        "/queue/notifications",
+                        Map.of(
+                                "type", "NEW_COMMENT",
+                                "notificationId", notification.getId(),
+                                "issueId", issue.getId(),
+                                "issueName", issue.getIssueName(),
+                                "projectName", project.getProjectName(),
+                                "commentBy", currentUser.getProfileName()
+                        )
+                );
+            }
         }
 
-        // Notify the issue creator if they are not the author or assignee
+        // Notify the issue creator if they are not the author and not already an assignee
+        List<UUID> assigneeIds = issue.getAssignees().stream()
+                .map(User::getId).collect(java.util.stream.Collectors.toList());
         if (issue.getCreatedBy() != null &&
                 !issue.getCreatedBy().getId().equals(currentUserId) &&
-                (issue.getAssignedTo() == null ||
-                        !issue.getCreatedBy().getId().equals(issue.getAssignedTo().getId()))) {
+                !assigneeIds.contains(issue.getCreatedBy().getId())) {
 
             User issueCreator = issue.getCreatedBy();
 
@@ -192,8 +192,7 @@ public class CommentService {
         // Notify the author of the parent comment if this is a reply
         if (parent != null &&
                 !parent.getUser().getId().equals(currentUserId) &&
-                (issue.getAssignedTo() == null ||
-                        !parent.getUser().getId().equals(issue.getAssignedTo().getId())) &&
+                !assigneeIds.contains(parent.getUser().getId()) &&
                 (issue.getCreatedBy() == null ||
                         !parent.getUser().getId().equals(issue.getCreatedBy().getId()))) {
 
@@ -303,6 +302,21 @@ public class CommentService {
 
         if (!isOwner && !isAuthor)
             throw new ForbiddenException("You can only delete your own comment");
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log comment deletion activity
+        activityService.log(
+                comment.getIssue().getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.COMMENT,
+                comment.getId(),
+                comment.getIssue().getIssueName(),
+                comment.getIssue(),
+                null
+        );
 
         commentRepository.delete(comment);
 

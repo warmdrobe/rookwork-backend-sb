@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -25,7 +26,7 @@ public class IssueResponse {
     public Status status;
     public UUID parentId;
     public UUID projectId;
-    public UserSummary assignedTo;
+    public List<UserSummary> assignees;
     public Instant deadline;
     public Instant createdAt;
     public Instant updatedAt;
