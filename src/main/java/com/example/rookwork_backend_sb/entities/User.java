@@ -52,6 +52,55 @@ public class User {
     @Column(name="updated_at")
     private Instant updatedAt;
 
+    @Column(name="job_title")
+    private String jobTitle;
+
+    @Column(name="language")
+    @Builder.Default
+    private String language = "en";
+
+    @Column(name="timezone")
+    @Builder.Default
+    private String timezone = "Asia/Ho_Chi_Minh";
+
+    @Column(name="organization")
+    private String organization;
+
+    @Column(name="location")
+    private String location;
+
+    @Column(name="email_public")
+    @Builder.Default
+    private boolean emailPublic = false;
+
+    @Column(name="job_title_public")
+    @Builder.Default
+    private boolean jobTitlePublic = true;
+
+    @Column(name="organization_public")
+    @Builder.Default
+    private boolean organizationPublic = true;
+
+    @Column(name="location_public")
+    @Builder.Default
+    private boolean locationPublic = true;
+
+    @Column(name="notify_issue_assigned")
+    @Builder.Default
+    private boolean notifyIssueAssigned = true;
+
+    @Column(name="notify_mentioned")
+    @Builder.Default
+    private boolean notifyMentioned = true;
+
+    @Column(name="notify_project_updates")
+    @Builder.Default
+    private boolean notifyProjectUpdates = false;
+
+    @Column(name="notify_daily_digest")
+    @Builder.Default
+    private boolean notifyDailyDigest = false;
+
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();
 

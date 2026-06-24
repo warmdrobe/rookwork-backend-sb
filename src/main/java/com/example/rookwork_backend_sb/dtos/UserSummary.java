@@ -11,9 +11,23 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+
 public class UserSummary {
     public UUID id;
     public String profileName;
     public String picture;
     public String email;
+    public String jobTitle;
+    public String language;
+    public String timezone;
+    public String organization;
+    public String location;
+    public boolean emailPublic;
+    public boolean jobTitlePublic;
+    public boolean organizationPublic;
+    public boolean locationPublic;
+    public Boolean notifyIssueAssigned;
+    public boolean notifyMentioned;
+    public boolean notifyProjectUpdates;
+    public boolean notifyDailyDigest;
 }
