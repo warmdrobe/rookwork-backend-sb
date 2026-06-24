@@ -304,7 +304,7 @@ public class IssueService {
             }
         }
 
-        // Log other modifications (priority, name, description, deadline) if changed
+        // Log other modifications  (priority, name, description, deadline) if changed
         if (priorityChanged) {
             activityService.log(
                     project, currentUser,

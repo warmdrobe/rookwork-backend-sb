@@ -52,4 +52,5 @@ jobs:
               -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
               -e JWT_EXPIRATION='604800000' \
               -e JWT_REFRESH_EXPIRATION='2592000000' \
+              -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
               rookwork-backend

@@ -88,6 +88,7 @@ public class CommentService {
                 ActivityEntityType.COMMENT,
                 comment.getId(),
                 issue.getIssueName(),
+                issue,
                 Map.of("preview", comment.getContent().length() > 50
                         ? comment.getContent().substring(0, 50) + "..."
                         : comment.getContent())
@@ -303,6 +304,21 @@ public class CommentService {
 
         if (!isOwner && !isAuthor)
             throw new ForbiddenException("You can only delete your own comment");
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log comment deletion activity
+        activityService.log(
+                comment.getIssue().getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.COMMENT,
+                comment.getId(),
+                comment.getIssue().getIssueName(),
+                comment.getIssue(),
+                null
+        );
 
         commentRepository.delete(comment);
 

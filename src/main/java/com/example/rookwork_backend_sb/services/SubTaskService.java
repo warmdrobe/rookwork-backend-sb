@@ -80,6 +80,7 @@ public class SubTaskService {
                 ActivityEntityType.SUBTASK,
                 subTask.getId(),
                 subTask.getSubtaskName(),
+                issue,
                 Map.of("issueId", issue.getId().toString(), "issueName", issue.getIssueName())
         );
 
@@ -123,6 +124,7 @@ public class SubTaskService {
             activityService.log(project, currentUser,
                     ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
+                    issue,
                     Map.of("field", "name", "to", request.getSubtaskName())
             );
         }
@@ -132,6 +134,7 @@ public class SubTaskService {
             activityService.log(project, currentUser,
                     ActivityAction.UPDATED, ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
+                    issue,
                     Map.of("field", "description", "to", request.getSubtaskDescription())
             );
         }
@@ -142,6 +145,7 @@ public class SubTaskService {
                     request.getIsDone() ? ActivityAction.COMPLETED : ActivityAction.UPDATED,
                     ActivityEntityType.SUBTASK,
                     subTask.getId(), subTask.getSubtaskName(),
+                    issue,
                     Map.of("field", "isDone", "to", request.getIsDone().toString())
             );
         }
@@ -178,7 +182,7 @@ public class SubTaskService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        issueRepository.findByIdAndProjectId(issueId, projectId)
+        Issue issue = issueRepository.findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
         SubTask subTask = subTaskRepository.findByIdAndIssueId(subtaskId, issueId)
@@ -192,6 +196,7 @@ public class SubTaskService {
                 ActivityEntityType.SUBTASK,
                 subTask.getId(),
                 subTask.getSubtaskName(),
+                issue,
                 null
         );
 
