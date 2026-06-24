@@ -36,13 +36,13 @@ public class WorkLogService {
      * @throws BadRequestException if timestamps are missing or endAt is before startAt
      */
     public List<WorkLogResponse> logWork(LogWorkRequest request) {
-        UUID userId = securityUtil.getCurrentUserId();
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
         Issue issue = issueRepository.findById(request.getIssueId())
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        User user = issue.getAssignedTo();
+        if (user == null) {
+            throw new BadRequestException("Cannot log work on an unassigned issue");
+        }
 
         // Validate time inputs
         if (request.getStartAt() == null || request.getEndAt() == null)
