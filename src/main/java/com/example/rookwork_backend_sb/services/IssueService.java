@@ -482,13 +482,16 @@ public class IssueService {
         response.setCreatedAt(issue.getCreatedAt());
         response.setUpdatedAt(issue.getUpdatedAt());
 
-        List<UserSummary> assignees = issue.getAssignees().stream().map(u -> {
-            UserSummary s = new UserSummary();
-            s.setId(u.getId());
-            s.setProfileName(u.getProfileName());
-            s.setPicture(u.getPicture());
-            return s;
-        }).collect(Collectors.toList());
+        List<UserSummary> assignees = new ArrayList<>();
+        if (issue.getAssignees() != null) {
+            assignees = issue.getAssignees().stream().map(u -> {
+                UserSummary s = new UserSummary();
+                s.setId(u.getId());
+                s.setProfileName(u.getProfileName());
+                s.setPicture(u.getPicture());
+                return s;
+            }).collect(Collectors.toList());
+        }
         response.setAssignees(assignees);
 
         return response;

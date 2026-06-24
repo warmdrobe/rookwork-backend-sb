@@ -47,6 +47,7 @@ public class Issue {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "issue_assignees",
