@@ -83,6 +83,7 @@ public class IssueService {
                 ActivityEntityType.ISSUE,
                 issue.getId(),
                 issue.getIssueName(),
+                issue,
                 null
         );
 
@@ -290,6 +291,7 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
+                        issue,
                         null
                 );
             } else {
@@ -335,6 +337,7 @@ public class IssueService {
                     issue.getId(),
                     issue.getIssueName(),
                     Map.of("field", "description", "to", issue.getDescription() != null ? issue.getDescription() : "")
+
             );
         }
 
@@ -371,6 +374,7 @@ public class IssueService {
      * @throws ForbiddenException if current user is not a member or not the project owner
      * @throws ResourceNotFoundException if the issue is not found
      */
+    @Transactional
     public void deleteIssue(UUID projectId, UUID issueId) {
 
         UUID currentUserId = securityUtil.getCurrentUserId();
@@ -387,6 +391,21 @@ public class IssueService {
         Issue issue = issueRepository
                 .findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log issue deletion activity (passing null for issue to prevent ON DELETE CASCADE from removing the log)
+        activityService.log(
+                issue.getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.ISSUE,
+                issue.getId(),
+                issue.getIssueName(),
+                null,
+                null
+        );
 
         issueRepository.delete(issue);
     }
