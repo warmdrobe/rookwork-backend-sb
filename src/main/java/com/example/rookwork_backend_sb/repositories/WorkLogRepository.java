@@ -21,18 +21,9 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
     // Lấy tất cả logs của một issue (để hiển thị trong TaskPanel)
     List<WorkLog> findAllByIssue_IdOrderByLoggedAtDesc(UUID issueId);
 
-    // Tổng giờ theo ngày của user
-    @Query("""
-        SELECT CAST(w.loggedAt AS LocalDate), SUM(w.hours)
-        FROM WorkLog w
-        WHERE w.user.id = :userId
-        AND w.loggedAt BETWEEN :from AND :to
-        GROUP BY CAST(w.loggedAt AS LocalDate)
-        ORDER BY CAST(w.loggedAt AS LocalDate)
-    """)
-    List<Object[]> sumHoursByDay(
-            @Param("userId") UUID userId,
-            @Param("from") Instant from,
-            @Param("to") Instant to
+    // Kiểm tra trùng lặp khoảng thời gian làm việc của cùng một user trong cùng một issue
+    boolean existsByUser_IdAndIssue_IdAndStartAtBeforeAndEndAtAfter(
+            UUID userId, UUID issueId, Instant endAt, Instant startAt
     );
+
 }
