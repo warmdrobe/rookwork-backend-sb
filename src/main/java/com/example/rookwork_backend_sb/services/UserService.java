@@ -79,17 +79,37 @@ public class UserService {
 
     public void updatePassword(UUID userId, UpdatePasswordRequest request) {
         User user = getUserOrThrow(userId);
-        
+
         // Google auth users might not have a password
         if (user.getPasswordHash() != null) {
             if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
                 throw new UnauthorizedException("Incorrect current password");
             }
         }
-        
+
+        validatePasswordStrength(request.getNewPassword());
+
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null || password.length() < 8) {
+            throw new BadRequestException("Password must be at least 8 characters");
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            throw new BadRequestException("Password must contain at least one uppercase letter");
+        }
+        if (!password.matches(".*[a-z].*")) {
+            throw new BadRequestException("Password must contain at least one lowercase letter");
+        }
+        if (!password.matches(".*\\d.*")) {
+            throw new BadRequestException("Password must contain at least one digit");
+        }
+        if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
+            throw new BadRequestException("Password must contain at least one special character");
+        }
     }
 
     private User getUserOrThrow(UUID userId) {
