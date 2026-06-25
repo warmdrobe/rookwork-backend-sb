@@ -16,4 +16,5 @@ public class UserSummary {
     public String profileName;
     public String picture;
     public String email;
+    public String role;
 }
