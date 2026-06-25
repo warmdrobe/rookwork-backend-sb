@@ -6,6 +6,7 @@ import com.example.rookwork_backend_sb.dtos.user.UpdatePreferencesRequest;
 import com.example.rookwork_backend_sb.dtos.user.UpdateProfileRequest;
 import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
