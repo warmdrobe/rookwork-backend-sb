@@ -35,6 +35,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final S3Service s3Service;
     /**
      * Creates a new comment under an issue, logs activity, and sends notifications.
      *
@@ -101,7 +102,7 @@ public class CommentService {
                 .user(UserSummary.builder()
                         .id(currentUser.getId())
                         .profileName(currentUser.getProfileName())
-                        .picture(currentUser.getPicture())
+                        .picture(s3Service.getAvatarUrl(currentUser.getPicture()))
                         .build())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
@@ -346,7 +347,7 @@ public class CommentService {
 
         return commentRepository.findByIssueProjectId(projectId)
                 .stream()
-                .map(CommentService::getCommentResponse)
+                .map(this::getCommentResponse)
                 .toList();
     }
 
@@ -360,12 +361,12 @@ public class CommentService {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)
                 .stream()
-                .map(CommentService::getCommentResponse)
+                .map(this::getCommentResponse)
                 .toList();
     }
 
     /// Mapper
-    private static CommentResponse getCommentResponse(Comment comment) {
+    private CommentResponse getCommentResponse(Comment comment) {
         CommentResponse response = new CommentResponse();
 
         response.setId(comment.getId());
@@ -385,7 +386,7 @@ public class CommentService {
             UserSummary user = new UserSummary();
             user.setId(comment.getUser().getId());
             user.setProfileName(comment.getUser().getProfileName());
-            user.setPicture(comment.getUser().getPicture());
+            user.setPicture(s3Service.getAvatarUrl(comment.getUser().getPicture()));
 
             response.setUser(user);
         }
@@ -394,7 +395,7 @@ public class CommentService {
         if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
             Set<CommentResponse> replies = comment.getReplies()
                     .stream()
-                    .map(CommentService::getCommentResponse)
+                    .map(this::getCommentResponse)
                     .collect(Collectors.toSet());
 
             response.setReplies(replies);
