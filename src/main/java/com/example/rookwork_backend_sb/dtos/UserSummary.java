@@ -30,4 +30,5 @@ public class UserSummary {
     public boolean notifyMentioned;
     public boolean notifyProjectUpdates;
     public boolean notifyDailyDigest;
+    public String role;
 }
