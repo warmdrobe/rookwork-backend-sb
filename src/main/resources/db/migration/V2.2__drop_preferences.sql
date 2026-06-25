@@ -1,0 +1,4 @@
+ALTER TABLE users 
+DROP COLUMN IF EXISTS theme, 
+DROP COLUMN IF EXISTS language, 
+DROP COLUMN IF EXISTS date_format;
