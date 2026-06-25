@@ -55,18 +55,41 @@ public class WorkLogService {
         if (!request.getEndAt().isAfter(request.getStartAt()))
             throw new BadRequestException("endAt must be after startAt");
 
-        LocalDateTime start = LocalDateTime.ofInstant(request.getStartAt(), ZoneOffset.UTC);
-        LocalDateTime end = LocalDateTime.ofInstant(request.getEndAt(), ZoneOffset.UTC);
+        // Check for overlapping work logs for the same user within the same issue
+        boolean hasOverlap = workLogRepository.existsByUser_IdAndIssue_IdAndStartAtBeforeAndEndAtAfter(
+                currentUserId, issue.getId(), request.getEndAt(), request.getStartAt()
+        );
+        if (hasOverlap) {
+            throw new BadRequestException("You have already logged work during this time period on this issue");
+        }
+
+        ZoneId zoneId = ZoneOffset.UTC;
+        if (request.getTimezone() != null && !request.getTimezone().isEmpty()) {
+            try {
+                zoneId = ZoneId.of(request.getTimezone());
+            } catch (Exception e) {
+                // fallback to UTC
+            }
+        }
+
+        ZonedDateTime start = request.getStartAt().atZone(zoneId);
+        ZonedDateTime end = request.getEndAt().atZone(zoneId);
+
+        // Restrict logging in the past (must be today or later in the user's local timezone)
+        ZonedDateTime todayStart = ZonedDateTime.now(zoneId).toLocalDate().atStartOfDay(zoneId);
+        if (start.isBefore(todayStart)) {
+            throw new BadRequestException("You cannot log work for past days");
+        }
 
         // Split the work duration into segments by day
         List<WorkLog> logs = new ArrayList<>();
-        LocalDateTime cursor = start;
+        ZonedDateTime cursor = start;
 
         while (cursor.isBefore(end)) {
-            // Get end of the current day in UTC
-            LocalDateTime dayEnd = cursor.toLocalDate().atTime(LocalTime.MAX);
+            // Get end of the current day in local timezone (11:59 PM)
+            ZonedDateTime dayEnd = cursor.toLocalDate().atTime(23, 59, 0).atZone(zoneId);
             // End the current segment at the earlier of end of day or total end time
-            LocalDateTime segmentEnd = dayEnd.isBefore(end) ? dayEnd : end;
+            ZonedDateTime segmentEnd = dayEnd.isBefore(end) ? dayEnd : end;
 
             // Calculate duration in hours
             double minutes = Duration.between(cursor, segmentEnd).toSeconds() / 60.0;
@@ -78,15 +101,17 @@ public class WorkLogService {
                         .issue(issue)
                         .user(currentUser)
                         .hours(hoursDecimal)
-                        .loggedAt(cursor.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant()) // Store start of day in UTC
+                        .loggedAt(cursor.toLocalDate().atStartOfDay(zoneId).toInstant()) // Store start of day in local zone converted to Instant
+                        .startAt(cursor.toInstant())
+                        .endAt(segmentEnd.toInstant())
                         .note(request.getNote())
                         .createdAt(Instant.now())
                         .build();
                 logs.add(log);
             }
 
-            // Advance cursor to the next day
-            cursor = cursor.toLocalDate().plusDays(1).atStartOfDay();
+            // Advance cursor to the next day in local timezone
+            cursor = cursor.toLocalDate().plusDays(1).atStartOfDay(zoneId);
         }
 
         workLogRepository.saveAll(logs);
@@ -149,6 +174,10 @@ public class WorkLogService {
 
 
     private static WorkLogResponse toResponse(WorkLog log, Issue issue) {
+        Instant startAt = log.getStartAt() != null ? log.getStartAt() : log.getLoggedAt();
+        Instant endAt = log.getEndAt() != null ? log.getEndAt() : log.getLoggedAt().plus(Duration.ofMinutes((long)(log.getHours().doubleValue() * 60)));
+        Instant createdAt = log.getCreatedAt() != null ? log.getCreatedAt() : log.getLoggedAt();
+
         return WorkLogResponse.builder()
                 .id(log.getId())
                 .issueId(issue.getId())
@@ -157,6 +186,9 @@ public class WorkLogService {
                 .userPicture(log.getUser().getPicture())
                 .hours(log.getHours())
                 .loggedAt(log.getLoggedAt())
+                .startAt(startAt)
+                .endAt(endAt)
+                .createdAt(createdAt)
                 .note(log.getNote())
                 .build();
     }
@@ -164,15 +196,15 @@ public class WorkLogService {
     private List<WorkStatsResponse.DailyHours> buildDailyHours(
             UUID userId, LocalDate from, LocalDate to) {
 
-        List<Object[]> rows = workLogRepository.sumHoursByDay(
+        List<WorkLog> logs = workLogRepository.findAllByUser_IdAndLoggedAtBetween(
                 userId,
                 from.atStartOfDay(ZoneOffset.UTC).toInstant(),
                 to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
         );
-        Map<LocalDate, BigDecimal> map = rows.stream()
-                .collect(Collectors.toMap(
-                        r -> (LocalDate) r[0],
-                        r -> (BigDecimal) r[1]
+        Map<LocalDate, BigDecimal> map = logs.stream()
+                .collect(Collectors.groupingBy(
+                        log -> LocalDate.ofInstant(log.getLoggedAt(), ZoneOffset.UTC),
+                        Collectors.reducing(BigDecimal.ZERO, WorkLog::getHours, BigDecimal::add)
                 ));
 
         List<WorkStatsResponse.DailyHours> result = new ArrayList<>();
@@ -190,16 +222,15 @@ public class WorkLogService {
     private List<WorkStatsResponse.DailyHours> buildMonthlyHours(
             UUID userId, LocalDate from, LocalDate to) {
 
-        List<Object[]> rows = workLogRepository.sumHoursByDay(
+        List<WorkLog> logs = workLogRepository.findAllByUser_IdAndLoggedAtBetween(
                 userId,
                 from.atStartOfDay(ZoneOffset.UTC).toInstant(),
                 to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
         );
         Map<Month, BigDecimal> map = new EnumMap<>(Month.class);
-        for (Object[] r : rows) {
-            LocalDate date = (LocalDate) r[0];
-            BigDecimal h = (BigDecimal) r[1];
-            map.merge(date.getMonth(), h, BigDecimal::add);
+        for (WorkLog log : logs) {
+            LocalDate date = LocalDate.ofInstant(log.getLoggedAt(), ZoneOffset.UTC);
+            map.merge(date.getMonth(), log.getHours(), BigDecimal::add);
         }
 
         List<WorkStatsResponse.DailyHours> result = new ArrayList<>();

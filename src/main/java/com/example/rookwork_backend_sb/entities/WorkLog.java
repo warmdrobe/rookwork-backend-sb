@@ -34,6 +34,12 @@ public class WorkLog {
     @Column(name = "logged_at", nullable = false)
     private Instant loggedAt;
 
+    @Column(name = "start_at")
+    private Instant startAt;
+
+    @Column(name = "end_at")
+    private Instant endAt;
+
     @Column(columnDefinition = "text")
     private String note;
 
