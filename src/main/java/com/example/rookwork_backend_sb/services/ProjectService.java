@@ -33,6 +33,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
+    private final S3Service s3Service;
 
     /**
      * Creates a new project and sets the creator as the project owner.
@@ -168,7 +169,7 @@ public class ProjectService {
                             .map(pm -> UserSummary.builder()
                                      .id(pm.getUser().getId())
                                      .profileName(pm.getUser().getProfileName())
-                                     .picture(pm.getUser().getPicture())
+                                     .picture(s3Service.getAvatarUrl(pm.getUser().getPicture()))
                                      .email(pm.getUser().getEmail())
                                      .role(pm.getRole() != null ? pm.getRole().name() : null)
                                      .build())

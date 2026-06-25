@@ -36,6 +36,7 @@ public class IssueService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
+    private final S3Service s3Service;
 
     /**
      * Creates a new issue in a project and logs the creation activity.
@@ -468,7 +469,7 @@ public class IssueService {
     }
 
     // issue mapping
-    private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
+    private IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();
         response.setId(issue.getId());
         response.setIssueName(issue.getIssueName());
@@ -488,11 +489,29 @@ public class IssueService {
                 UserSummary s = new UserSummary();
                 s.setId(u.getId());
                 s.setProfileName(u.getProfileName());
-                s.setPicture(u.getPicture());
+                s.setPicture(s3Service.getAvatarUrl(u.getPicture()));
                 return s;
             }).collect(Collectors.toList());
         }
         response.setAssignees(assignees);
+
+        List<AttachmentResponse> attachments = new ArrayList<>();
+        if (issue.getAttachments() != null) {
+            attachments = issue.getAttachments().stream().map(file -> {
+                String presignedUrl = s3Service.generatePresignedUrl(file.getStoredName());
+                return AttachmentResponse.builder()
+                        .id(file.getId())
+                        .originalName(file.getOriginalName())
+                        .storedName(file.getStoredName())
+                        .mimeType(file.getMimeType())
+                        .sizeBytes(file.getSizeBytes())
+                        .uploadedBy(file.getUploadedBy())
+                        .createdAt(file.getCreatedAt())
+                        .presignedUrl(presignedUrl)
+                        .build();
+            }).collect(Collectors.toList());
+        }
+        response.setAttachments(attachments);
 
         return response;
     }

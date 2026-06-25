@@ -30,4 +30,5 @@ public class IssueResponse {
     public Instant deadline;
     public Instant createdAt;
     public Instant updatedAt;
+    public List<AttachmentResponse> attachments;
 }

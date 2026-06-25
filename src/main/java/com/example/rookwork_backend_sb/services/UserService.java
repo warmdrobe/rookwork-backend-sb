@@ -12,6 +12,9 @@ import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
+import java.io.IOException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -22,6 +25,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final S3Service s3Service;
 
     public void updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = getUserOrThrow(userId);
@@ -54,6 +58,34 @@ public class UserService {
         }
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+    }
+
+    @Transactional
+    public String uploadAvatar(UUID userId, MultipartFile file) throws IOException {
+        User user = getUserOrThrow(userId);
+
+        // 1. Upload to S3
+        String storedName = s3Service.uploadAvatar(file, userId);
+
+        // 2. Track old picture to clean up
+        String oldPicture = user.getPicture();
+
+        // 3. Update user profile picture
+        user.setPicture(storedName);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        // 4. Clean up old S3 avatar if exists
+        if (oldPicture != null && oldPicture.startsWith("avatar/")) {
+            try {
+                s3Service.deleteFile(oldPicture);
+            } catch (Exception e) {
+                // Ignore error during cleanup
+            }
+        }
+
+        // 5. Return presigned URL
+        return s3Service.getAvatarUrl(storedName);
     }
 
     public void updatePreferences(UUID userId, UpdatePreferencesRequest request) {
