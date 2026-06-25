@@ -55,14 +55,6 @@ public class User {
     @Column(name="job_title")
     private String jobTitle;
 
-    @Column(name="language")
-    @Builder.Default
-    private String language = "en";
-
-    @Column(name="timezone")
-    @Builder.Default
-    private String timezone = "Asia/Ho_Chi_Minh";
-
     @Column(name="organization")
     private String organization;
 
