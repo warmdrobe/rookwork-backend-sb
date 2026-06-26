@@ -1,22 +1,42 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.dtos.UserSummary;
-import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
-import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
-import com.example.rookwork_backend_sb.entities.*;
-import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
-import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
-import com.example.rookwork_backend_sb.repositories.*;
-import com.example.rookwork_backend_sb.security.SecurityUtil;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.example.rookwork_backend_sb.dtos.UserSummary;
+import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
+import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
+import com.example.rookwork_backend_sb.entities.ActivityAction;
+import com.example.rookwork_backend_sb.entities.ActivityEntityType;
+import com.example.rookwork_backend_sb.entities.Comment;
+import com.example.rookwork_backend_sb.entities.Issue;
+import com.example.rookwork_backend_sb.entities.Notification;
+import com.example.rookwork_backend_sb.entities.Project;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
+import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
+import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.repositories.CommentRepository;
+import com.example.rookwork_backend_sb.repositories.IssueRepository;
+import com.example.rookwork_backend_sb.repositories.NotificationRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectRepository;
+import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.security.SecurityUtil;
+
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 

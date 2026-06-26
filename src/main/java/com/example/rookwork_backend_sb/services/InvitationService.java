@@ -1,20 +1,33 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.dtos.invitations.InvitationResponse;
-import com.example.rookwork_backend_sb.entities.*;
-import com.example.rookwork_backend_sb.exceptions.ConflictException;
-import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
-import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.repositories.*;
-import com.example.rookwork_backend_sb.security.SecurityUtil;
-import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+import com.example.rookwork_backend_sb.dtos.invitations.InvitationResponse;
+import com.example.rookwork_backend_sb.entities.Invitation;
+import com.example.rookwork_backend_sb.entities.InvitationStatus;
+import com.example.rookwork_backend_sb.entities.Notification;
+import com.example.rookwork_backend_sb.entities.Project;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
+import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
+import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.ConflictException;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.repositories.InvitationRepository;
+import com.example.rookwork_backend_sb.repositories.NotificationRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectRepository;
+import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.security.SecurityUtil;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * Service class managing project invitation workflows (sending invites, responding, and list queries).
@@ -30,7 +43,7 @@ public class InvitationService {
     private final SecurityUtil securityUtil;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
-
+    private final EmailService emailService;
     /**
      * Sends a project invitation to a user by email.
      *
@@ -102,6 +115,11 @@ public class InvitationService {
                         "projectName", project.getProjectName(),
                         "invitedBy", sender.getUser().getProfileName()
                 )
+        );
+        emailService.sendProjectInvitation(
+                invitedUser.getEmail(),
+                project.getProjectName(),
+                sender.getUser().getProfileName()
         );
     }
 
