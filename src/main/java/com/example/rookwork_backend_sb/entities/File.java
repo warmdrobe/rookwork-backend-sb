@@ -42,8 +42,13 @@ public class File {
     @Column(name="updated_at")
     private Instant updatedAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_id")
+    private Issue issue;
+
 }
+

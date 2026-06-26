@@ -33,6 +33,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
+    private final S3Service s3Service;
 
     /**
      * Creates a new project and sets the creator as the project owner.
@@ -168,7 +169,9 @@ public class ProjectService {
                             .map(pm -> UserSummary.builder()
                                      .id(pm.getUser().getId())
                                      .profileName(pm.getUser().getProfileName())
-                                     .picture(pm.getUser().getPicture())
+                                     .picture(s3Service.getAvatarUrl(pm.getUser().getPicture()))
+                                     .email(pm.getUser().getEmail())
+                                     .role(pm.getRole() != null ? pm.getRole().name() : null)
                                      .build())
                             .collect(Collectors.toList());
 
@@ -176,12 +179,18 @@ public class ProjectService {
                     long total = issueRepository.countByProjectId(member.getProject().getId());
                     long done = issueRepository.countByProjectIdAndStatus(member.getProject().getId(), Status.DONE);
 
+                    String ownerName = members.stream()
+                            .filter(m -> "OWNER".equals(m.getRole()))
+                            .map(UserSummary::getProfileName)
+                            .findFirst()
+                            .orElse(member.getUser().getProfileName());
+
                     return ProjectResponse.builder()
                             .id(member.getProject().getId())
                             .projectName(member.getProject().getProjectName())
                             .description(member.getProject().getDescription())
                             .isPrivate(member.getProject().isPrivate())
-                            .ownerName(member.getUser().getProfileName())
+                            .ownerName(ownerName)
                             .members(members)
                             .totalIssues(total)
                             .doneIssues(done)

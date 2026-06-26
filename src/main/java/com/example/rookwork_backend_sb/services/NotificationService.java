@@ -23,6 +23,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SecurityUtil securityUtil;
+    private final S3Service s3Service;
 
     /**
      * Retrieves all notifications for the current authenticated user.
@@ -34,7 +35,7 @@ public class NotificationService {
         return notificationRepository
                 .findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream()
-                .map(NotificationService::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -48,7 +49,7 @@ public class NotificationService {
         return notificationRepository
                 .findByUserIdAndIsReadFalseOrderByCreatedAtDesc(currentUserId)
                 .stream()
-                .map(NotificationService::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -117,14 +118,14 @@ public class NotificationService {
         notificationRepository.delete(notification);
     }
 
-    private static NotificationResponse toResponse(Notification n) {
+    private NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId())
                 .title(n.getTitle())
                 .sender(n.getSender() != null ? UserSummary.builder()
                         .id(n.getSender().getId())
                         .profileName(n.getSender().getProfileName())
-                        .picture(n.getSender().getPicture())
+                        .picture(s3Service.getAvatarUrl(n.getSender().getPicture()))
                         .build() : null)
                 .message(n.getMessage())
                 .issueId(n.getIssue() != null ? n.getIssue().getId() : null)
