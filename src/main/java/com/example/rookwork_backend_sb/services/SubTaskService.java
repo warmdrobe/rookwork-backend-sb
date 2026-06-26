@@ -49,10 +49,6 @@ public class SubTaskService {
         public SubTaskResponse createSubTask(UUID projectId, UUID issueId, CreateSubTaskRequest request) {
                 UUID currentUserId = securityUtil.getCurrentUserId();
 
-                // Check project membership
-                if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-                        throw new ForbiddenException("Not a member of this project");
-
                 User currentUser = userRepository.findById(currentUserId)
                                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
@@ -102,10 +98,6 @@ public class SubTaskService {
         public SubTaskResponse updateSubTask(UUID projectId, UUID issueId, UUID subtaskId,
                         UpdateSubTaskRequest request) {
                 UUID currentUserId = securityUtil.getCurrentUserId();
-
-                // Check project membership
-                if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-                        throw new ForbiddenException("Not a member of this project");
 
                 User currentUser = userRepository.findById(currentUserId)
                                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
@@ -165,11 +157,11 @@ public class SubTaskService {
         public void deleteSubTask(UUID projectId, UUID issueId, UUID subtaskId) {
                 UUID currentUserId = securityUtil.getCurrentUserId();
 
+                // Verify the user is an OWNER (via projectMember load, needed for role check)
                 ProjectMember member = projectMemberRepository
                                 .findById(new ProjectMemberId(currentUserId, projectId))
                                 .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
 
-                // Verify the user is authorized to delete subtasks
                 if (member.getRole() != ProjectRole.OWNER)
                         throw new ForbiddenException("Only OWNER can delete subtask");
 
