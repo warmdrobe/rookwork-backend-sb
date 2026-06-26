@@ -2,6 +2,7 @@ package com.example.rookwork_backend_sb.repositories;
 
 import com.example.rookwork_backend_sb.entities.ProjectMember;
 import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -12,4 +13,5 @@ public interface ProjectMemberRepository
     List<ProjectMember> findAllByUser_Id(UUID userId);
     List<ProjectMember> findAllByProject_Id(UUID projectId);
     boolean existsById (ProjectMemberId id);
+    boolean existsByIdAndRole(ProjectMemberId id, ProjectRole role);
 }

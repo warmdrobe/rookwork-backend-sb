@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.invitations.SendInviteRequest;
 import com.example.rookwork_backend_sb.services.InvitationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -24,6 +25,7 @@ public class InvitationController {
      * @param request the invite details containing project ID and recipient email
      * @return response entity indicating the invite has been sent successfully
      */
+    @PreAuthorize("@projectSecurity.isOwner(#request.projectId)")
     @PostMapping("/send")
     public ResponseEntity<?> sendInvite(@RequestBody SendInviteRequest request) {
         invitationService.sendInvite(request.getProjectId(), request.getEmail());
