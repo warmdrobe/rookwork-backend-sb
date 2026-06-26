@@ -71,10 +71,6 @@ public class CommentService {
     public CommentResponse createComment(UUID projectId, UUID issueId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Check if the current user has permission to comment on this project
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
@@ -264,15 +260,16 @@ public class CommentService {
     public CommentResponse updateComment(UUID projectId, UUID issueId, UUID commentId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Check project membership
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
 
         // Verify that only the original author can edit the comment
         if (!comment.getUser().getId().equals(currentUserId))
@@ -307,11 +304,13 @@ public class CommentService {
     public void deleteComment(UUID projectId, UUID issueId, UUID commentId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
 
         ProjectMember currentMember = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
@@ -362,9 +361,6 @@ public class CommentService {
     public List<CommentResponse> getAllCommentByProjectId(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         return commentRepository.findByIssueProjectId(projectId)
                 .stream()
                 .map(this::getCommentResponse)
@@ -374,11 +370,15 @@ public class CommentService {
     /**
      * Retrieves all root comments (replies nested recursively) for a specific issue.
      *
+     * @param projectId the unique identifier of the project (for path consistency check)
      * @param issueId the unique identifier of the issue
      * @return a list of top-level CommentResponse DTOs
      */
-    public List<CommentResponse> getAllCommentByIssueId(UUID issueId) {
+    public List<CommentResponse> getAllCommentByIssueId(UUID projectId, UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
+        // Path consistency check: verify issue actually belongs to this project
+        issueRepository.findByIdAndProjectId(issueId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this project"));
         return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)
                 .stream()
                 .map(this::getCommentResponse)

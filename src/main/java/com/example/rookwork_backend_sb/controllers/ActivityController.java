@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.activities.ActivityResponse;
 import com.example.rookwork_backend_sb.services.ActivityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("api/projects/{projectId}")
 @RequiredArgsConstructor
+@PreAuthorize("@projectSecurity.isMember(#projectId)")
 public class ActivityController {
 
   private final ActivityService activityService;

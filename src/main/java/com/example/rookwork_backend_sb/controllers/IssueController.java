@@ -6,6 +6,7 @@ import com.example.rookwork_backend_sb.dtos.issues.UpdateIssueRequest;
 import com.example.rookwork_backend_sb.services.IssueService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class IssueController {
      * @param request the issue details payload
      * @return response entity containing the created IssueResponse DTO
      */
+    @PreAuthorize("@projectSecurity.isMember(#projectId)")
     @PostMapping("api/projects/{projectId}/issues")
     public ResponseEntity<IssueResponse> createIssue(
             @PathVariable UUID projectId,
@@ -42,6 +44,7 @@ public class IssueController {
      * @param request the updated fields payload
      * @return response entity containing the updated IssueResponse DTO
      */
+    @PreAuthorize("@projectSecurity.isMember(#projectId)")
     @PutMapping("api/projects/{projectId}/issues/{issueId}")
     public ResponseEntity<IssueResponse> updateIssue(
             @PathVariable UUID projectId,
@@ -57,6 +60,7 @@ public class IssueController {
      * @param issueId the unique identifier of the issue to delete
      * @return empty response entity indicating successful deletion
      */
+    @PreAuthorize("@projectSecurity.isOwner(#projectId)")
     @DeleteMapping("api/projects/{projectId}/issues/{issueId}")
     public ResponseEntity<Void> deleteIssue(
             @PathVariable UUID projectId,
@@ -71,6 +75,7 @@ public class IssueController {
      * @param projectId the unique identifier of the project
      * @return response entity containing a list of IssueResponse DTOs
      */
+    @PreAuthorize("@projectSecurity.isMember(#projectId)")
     @GetMapping("api/projects/{projectId}/issues")
     public ResponseEntity<List<IssueResponse>> getAllIssues(
             @PathVariable UUID projectId) {
@@ -93,6 +98,7 @@ public class IssueController {
      * @param issueId the unique identifier of the issue
      * @return response entity containing the IssueResponse DTO
      */
+    @PreAuthorize("@projectSecurity.isMemberOfIssue(#issueId)")
     @GetMapping("api/issues/{issueId}")
     public ResponseEntity<IssueResponse> getIssueById(
             @PathVariable UUID issueId) {

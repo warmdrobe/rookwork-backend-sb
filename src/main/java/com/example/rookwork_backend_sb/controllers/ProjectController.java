@@ -6,6 +6,7 @@ import com.example.rookwork_backend_sb.dtos.projects.UpdateProjectRequest;
 import com.example.rookwork_backend_sb.services.ProjectService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,6 +48,7 @@ public class ProjectController {
      * @param request the fields to update payload
      * @return response entity containing the updated ProjectResponse DTO
      */
+    @PreAuthorize("@projectSecurity.isOwner(#projectId)")
     @PutMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> updateProject(
             @PathVariable UUID projectId,
@@ -60,6 +62,7 @@ public class ProjectController {
      * @param projectId the unique identifier of the project to delete
      * @return empty response entity indicating successful deletion
      */
+    @PreAuthorize("@projectSecurity.isOwner(#projectId)")
     @DeleteMapping("/{projectId}")
     public ResponseEntity<Void> deleteProject(@PathVariable UUID projectId) {
         service.deleteProject(projectId);
