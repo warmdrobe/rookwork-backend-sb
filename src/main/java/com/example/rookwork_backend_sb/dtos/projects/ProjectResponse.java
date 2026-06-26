@@ -16,7 +16,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonPropertyOrder({"id", "projectName", "isPrivate", "ownerName", "members", "createdAt", "updatedAt"})
+@JsonPropertyOrder({"id", "projectName", "isPrivate", "ownerName", "members", "createdAt", "updatedAt", "deadline"})
 public class ProjectResponse {
     public UUID id;
     public String projectName;
@@ -29,4 +29,5 @@ public class ProjectResponse {
     public long doneIssues;
     public Instant createdAt;
     public Instant updatedAt;
+    public Instant deadline;
 }

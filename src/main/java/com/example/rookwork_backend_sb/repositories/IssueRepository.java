@@ -24,4 +24,7 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
     //process
     long countByProjectId(UUID projectId);
     long countByProjectIdAndStatus(UUID projectId, Status status);
+
+    @Query("SELECT MAX(i.deadline) FROM Issue i WHERE i.project.id = :projectId")
+    java.time.Instant findMaxDeadlineByProjectId(@Param("projectId") UUID projectId);
 }
