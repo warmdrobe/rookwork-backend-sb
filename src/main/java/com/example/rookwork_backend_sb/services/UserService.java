@@ -110,12 +110,6 @@ public class UserService {
 
     public void updatePreferences(UUID userId, UpdatePreferencesRequest request) {
         User user = getUserOrThrow(userId);
-        if (request.getLanguage() != null) {
-            user.setLanguage(request.getLanguage());
-        }
-        if (request.getTimezone() != null) {
-            user.setTimezone(request.getTimezone());
-        }
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
     }

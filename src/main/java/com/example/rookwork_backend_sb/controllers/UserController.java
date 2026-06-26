@@ -56,8 +56,6 @@ public class UserController {
         .email(user.getEmail())
         .picture(s3Service.getAvatarUrl(user.getPicture()))
         .jobTitle(user.getJobTitle())
-        .language(user.getLanguage())
-        .timezone(user.getTimezone())
         .organization(user.getOrganization())
         .location(user.getLocation())
         .emailPublic(user.isEmailPublic())
