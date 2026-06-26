@@ -77,6 +77,7 @@ public class ProjectService {
         response.setOwnerName(user.getProfileName());
         response.setCreatedAt(project.getCreatedAt());
         response.setUpdatedAt(project.getUpdatedAt());
+        response.setDeadline(null);
 
         return response;
     }
@@ -123,6 +124,7 @@ public class ProjectService {
         response.setOwnerName(member.getUser().getProfileName());
         response.setCreatedAt(project.getCreatedAt());
         response.setUpdatedAt(project.getUpdatedAt());
+        response.setDeadline(issueRepository.findMaxDeadlineByProjectId(projectId));
 
         return response;
     }
@@ -178,6 +180,7 @@ public class ProjectService {
                     // Count total and resolved issues within the project
                     long total = issueRepository.countByProjectId(member.getProject().getId());
                     long done = issueRepository.countByProjectIdAndStatus(member.getProject().getId(), Status.DONE);
+                    Instant deadline = issueRepository.findMaxDeadlineByProjectId(member.getProject().getId());
 
                     String ownerName = members.stream()
                             .filter(m -> "OWNER".equals(m.getRole()))
@@ -196,6 +199,7 @@ public class ProjectService {
                             .doneIssues(done)
                             .createdAt(member.getProject().getCreatedAt())
                             .updatedAt(member.getProject().getUpdatedAt())
+                            .deadline(deadline)
                             .build();
                 })
 
