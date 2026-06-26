@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.rookwork_backend_sb.services.S3Service;
 import java.io.IOException;
@@ -83,6 +84,13 @@ public class UserController {
     UUID userId = securityUtil.getCurrentUserId();
     String avatarUrl = userService.uploadAvatar(userId, file);
     return ResponseEntity.ok(java.util.Map.of("avatarUrl", avatarUrl));
+  }
+
+  @DeleteMapping("/me/avatar")
+  public ResponseEntity<Void> deleteAvatar() {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.deleteAvatar(userId);
+    return ResponseEntity.noContent().build();
   }
 
   @PutMapping("/me/preferences")

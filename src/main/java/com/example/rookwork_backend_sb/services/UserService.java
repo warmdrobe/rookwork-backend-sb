@@ -88,6 +88,26 @@ public class UserService {
         return s3Service.getAvatarUrl(storedName);
     }
 
+    @Transactional
+    public void deleteAvatar(UUID userId) {
+        User user = getUserOrThrow(userId);
+        String oldPicture = user.getPicture();
+
+        // 1. Reset picture to null in database
+        user.setPicture(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        // 2. Clean up S3 file if it was an uploaded avatar
+        if (oldPicture != null && oldPicture.startsWith("avatar/")) {
+            try {
+                s3Service.deleteFile(oldPicture);
+            } catch (Exception e) {
+                // Ignore error during S3 cleanup
+            }
+        }
+    }
+
     public void updatePreferences(UUID userId, UpdatePreferencesRequest request) {
         User user = getUserOrThrow(userId);
         if (request.getLanguage() != null) {

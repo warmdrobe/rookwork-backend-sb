@@ -23,6 +23,7 @@ import java.util.UUID;
 public class ActivityService {
     private final ActivityRepository activityRepository;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final S3Service s3Service;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -214,7 +215,7 @@ public class ActivityService {
         return ActivityResponse.builder()
                 .id(a.getId())
                 .actorName(a.getActor().getProfileName())
-                .actorPicture(a.getActor().getPicture())
+                .actorPicture(s3Service.getAvatarUrl(a.getActor().getPicture()))
                 .actionType(a.getActionType().name())
                 .entityType(a.getEntityType().name())
                 .entityId(a.getEntityId())
