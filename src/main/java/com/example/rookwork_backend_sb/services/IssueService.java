@@ -12,6 +12,8 @@ import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -61,7 +63,7 @@ public class IssueService {
 
         Issue issue = Issue.builder()
                 .issueName(request.getIssueName())
-                .description(request.getDescription())
+                .description(sanitizeHtml(request.getDescription()))
                 .issueType(request.getIssueType())
                 .priority(request.getPriority())
                 .status(request.getStatus())
@@ -144,7 +146,7 @@ public class IssueService {
         }
 
         if (request.getDescription() != null) {
-            String newDesc = request.getDescription();
+            String newDesc = sanitizeHtml(request.getDescription());
             String oldDesc = issue.getDescription();
             if (oldDesc == null ? newDesc != null : !oldDesc.equals(newDesc)) {
                 issue.setDescription(newDesc);
@@ -511,5 +513,20 @@ public class IssueService {
         response.setSubtasks(subtasks);
 
         return response;
+    }
+
+    /**
+     * Sanitizes user-submitted HTML content to prevent XSS Stored attacks.
+     * Allows a safe subset of HTML tags and attributes (bold, italic, lists, links, images)
+     * produced by rich-text editors like Tiptap. Strips any {@code <script>} or event handler attributes.
+     *
+     * @param html raw HTML input from the client (may be null)
+     * @return sanitized HTML, or null if the input was null
+     */
+    private String sanitizeHtml(String html) {
+        if (html == null) {
+            return null;
+        }
+        return Jsoup.clean(html, Safelist.basicWithImages());
     }
 }
