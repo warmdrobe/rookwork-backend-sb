@@ -1,22 +1,42 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.dtos.UserSummary;
-import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
-import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
-import com.example.rookwork_backend_sb.entities.*;
-import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
-import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
-import com.example.rookwork_backend_sb.repositories.*;
-import com.example.rookwork_backend_sb.security.SecurityUtil;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.example.rookwork_backend_sb.dtos.UserSummary;
+import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
+import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
+import com.example.rookwork_backend_sb.entities.ActivityAction;
+import com.example.rookwork_backend_sb.entities.ActivityEntityType;
+import com.example.rookwork_backend_sb.entities.Comment;
+import com.example.rookwork_backend_sb.entities.Issue;
+import com.example.rookwork_backend_sb.entities.Notification;
+import com.example.rookwork_backend_sb.entities.Project;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
+import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
+import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.repositories.CommentRepository;
+import com.example.rookwork_backend_sb.repositories.IssueRepository;
+import com.example.rookwork_backend_sb.repositories.NotificationRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectRepository;
+import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.security.SecurityUtil;
+
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 
@@ -50,10 +70,6 @@ public class CommentService {
     @Transactional
     public CommentResponse createComment(UUID projectId, UUID issueId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-
-        // Check if the current user has permission to comment on this project
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
 
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
@@ -244,15 +260,16 @@ public class CommentService {
     public CommentResponse updateComment(UUID projectId, UUID issueId, UUID commentId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Check project membership
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
 
         // Verify that only the original author can edit the comment
         if (!comment.getUser().getId().equals(currentUserId))
@@ -287,11 +304,13 @@ public class CommentService {
     public void deleteComment(UUID projectId, UUID issueId, UUID commentId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
 
         ProjectMember currentMember = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
@@ -342,9 +361,6 @@ public class CommentService {
     public List<CommentResponse> getAllCommentByProjectId(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         return commentRepository.findByIssueProjectId(projectId)
                 .stream()
                 .map(this::getCommentResponse)
@@ -354,11 +370,15 @@ public class CommentService {
     /**
      * Retrieves all root comments (replies nested recursively) for a specific issue.
      *
+     * @param projectId the unique identifier of the project (for path consistency check)
      * @param issueId the unique identifier of the issue
      * @return a list of top-level CommentResponse DTOs
      */
-    public List<CommentResponse> getAllCommentByIssueId(UUID issueId) {
+    public List<CommentResponse> getAllCommentByIssueId(UUID projectId, UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
+        // Path consistency check: verify issue actually belongs to this project
+        issueRepository.findByIdAndProjectId(issueId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this project"));
         return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)
                 .stream()
                 .map(this::getCommentResponse)

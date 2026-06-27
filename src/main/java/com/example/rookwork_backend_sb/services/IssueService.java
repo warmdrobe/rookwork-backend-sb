@@ -52,10 +52,6 @@ public class IssueService {
     public IssueResponse createIssue(UUID projectId, CreateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Verify the creator is a member of the project
-        if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
@@ -106,10 +102,6 @@ public class IssueService {
      */
     public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-
-        // Verify project membership
-        if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
 
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
@@ -393,15 +385,6 @@ public class IssueService {
 
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        ProjectMember member = projectMemberRepository
-                .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new ForbiddenException("Not a member of project"));
-
-        // Only the project owner can delete issues
-        if (member.getRole() != ProjectRole.OWNER) {
-            throw new ForbiddenException("Only OWNER can delete issue");
-        }
-
         Issue issue = issueRepository
                 .findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
@@ -433,8 +416,6 @@ public class IssueService {
      */
     public List<IssueResponse> getAllIssue(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
         return issueRepository.findAllByProjectId(projectId)
                 .stream()
                 .map(issue -> getIssueResponse(projectId, issue))

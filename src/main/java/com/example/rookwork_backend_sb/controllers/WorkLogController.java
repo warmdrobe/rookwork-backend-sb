@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.worklog.*;
 import com.example.rookwork_backend_sb.services.WorkLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,6 +26,7 @@ public class WorkLogController {
      * @param request the log work details containing issue ID and start/end times
      * @return response entity containing a list of split WorkLogResponse DTOs
      */
+    @PreAuthorize("@projectSecurity.isMemberOfIssue(#request.issueId)")
     @PostMapping
     public ResponseEntity<List<WorkLogResponse>> logWork(@RequestBody LogWorkRequest request) {
         return ResponseEntity.ok(workLogService.logWork(request));
@@ -36,6 +38,7 @@ public class WorkLogController {
      * @param issueId the unique identifier of the issue
      * @return response entity containing a list of WorkLogResponse DTOs
      */
+    @PreAuthorize("@projectSecurity.isMemberOfIssue(#issueId)")
     @GetMapping("/issue/{issueId}")
     public ResponseEntity<List<WorkLogResponse>> getByIssue(@PathVariable UUID issueId) {
         return ResponseEntity.ok(workLogService.getByIssue(issueId));

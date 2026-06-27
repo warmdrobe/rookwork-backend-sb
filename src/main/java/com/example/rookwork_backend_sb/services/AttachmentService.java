@@ -43,11 +43,6 @@ public class AttachmentService {
     public List<AttachmentResponse> uploadAttachments(UUID projectId, UUID issueId, MultipartFile[] files) throws IOException {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Check project membership
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId))) {
-            throw new ForbiddenException("Not a member of this project");
-        }
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authenticated"));
 
@@ -99,11 +94,6 @@ public class AttachmentService {
     @Transactional
     public void deleteAttachment(UUID projectId, UUID issueId, UUID fileId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-
-        // Check project membership
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId))) {
-            throw new ForbiddenException("Not a member of this project");
-        }
 
         File file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));

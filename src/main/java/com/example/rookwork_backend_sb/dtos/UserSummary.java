@@ -18,8 +18,6 @@ public class UserSummary {
     public String picture;
     public String email;
     public String jobTitle;
-    public String language;
-    public String timezone;
     public String organization;
     public String location;
     public boolean emailPublic;

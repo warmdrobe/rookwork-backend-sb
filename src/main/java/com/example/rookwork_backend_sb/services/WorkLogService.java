@@ -26,6 +26,7 @@ public class WorkLogService {
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
+    private final S3Service s3Service;
     
     /**
      * Logs work hours. If the work span crosses day boundaries (UTC), it automatically splits into daily segments.
@@ -173,7 +174,7 @@ public class WorkLogService {
     }
 
 
-    private static WorkLogResponse toResponse(WorkLog log, Issue issue) {
+    private WorkLogResponse toResponse(WorkLog log, Issue issue) {
         Instant startAt = log.getStartAt() != null ? log.getStartAt() : log.getLoggedAt();
         Instant endAt = log.getEndAt() != null ? log.getEndAt() : log.getLoggedAt().plus(Duration.ofMinutes((long)(log.getHours().doubleValue() * 60)));
         Instant createdAt = log.getCreatedAt() != null ? log.getCreatedAt() : log.getLoggedAt();
@@ -183,7 +184,7 @@ public class WorkLogService {
                 .issueId(issue.getId())
                 .issueName(issue.getIssueName())
                 .userProfileName(log.getUser().getProfileName())
-                .userPicture(log.getUser().getPicture())
+                .userPicture(s3Service.getAvatarUrl(log.getUser().getPicture()))
                 .hours(log.getHours())
                 .loggedAt(log.getLoggedAt())
                 .startAt(startAt)
