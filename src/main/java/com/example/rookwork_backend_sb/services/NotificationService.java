@@ -30,6 +30,7 @@ public class NotificationService {
      *
      * @return a list of NotificationResponse DTOs
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<NotificationResponse> getAll() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
@@ -44,6 +45,7 @@ public class NotificationService {
      *
      * @return a list of unread NotificationResponse DTOs
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<NotificationResponse> getUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
@@ -58,6 +60,7 @@ public class NotificationService {
      *
      * @return the count of unread notifications
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public long countUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository.countByUserIdAndIsReadFalse(currentUserId);
@@ -70,6 +73,7 @@ public class NotificationService {
      * @throws ResourceNotFoundException if the notification does not exist
      * @throws ForbiddenException if the notification does not belong to the current user
      */
+    @org.springframework.transaction.annotation.Transactional
     public void markAsRead(UUID notificationId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         Notification notification = notificationRepository.findById(notificationId)
@@ -87,6 +91,7 @@ public class NotificationService {
     /**
      * Marks all unread notifications for the current user as read.
      */
+    @org.springframework.transaction.annotation.Transactional
     public void markAllAsRead() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         List<Notification> unread = notificationRepository
@@ -106,6 +111,7 @@ public class NotificationService {
      * @throws ResourceNotFoundException if the notification is not found
      * @throws ForbiddenException if the notification does not belong to the current user
      */
+    @org.springframework.transaction.annotation.Transactional
     public void delete(UUID notificationId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         Notification notification = notificationRepository.findById(notificationId)
@@ -131,6 +137,8 @@ public class NotificationService {
                 .issueId(n.getIssue() != null ? n.getIssue().getId() : null)
                 .issueName(n.getIssue() != null ? n.getIssue().getIssueName() : null)
                 .invitationId(n.getInvitation() != null ? n.getInvitation().getId() : null)
+                .invitationStatus(n.getInvitation() != null ? n.getInvitation().getStatus().name() : null)
+                .projectId(n.getInvitation() != null ? n.getInvitation().getProject().getId() : (n.getIssue() != null ? n.getIssue().getProject().getId() : null))
                 .isRead(n.isRead())
                 .createdAt(n.getCreatedAt())
                 .build();

@@ -56,4 +56,28 @@ public class InvitationController {
     public ResponseEntity<?> getPending() {
         return ResponseEntity.ok(invitationService.getPendingInvites());
     }
+
+    /**
+     * Retrieves all pending invitations for a specific project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return response entity containing a list of pending invitations for the project
+     */
+    @PreAuthorize("@projectSecurity.isMember(#projectId)")
+    @GetMapping("/project/{projectId}/pending")
+    public ResponseEntity<?> getPendingForProject(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(invitationService.getPendingInvitesForProject(projectId));
+    }
+
+    /**
+     * Cancels/revokes a pending project invitation.
+     *
+     * @param invitationId the unique identifier of the invitation to cancel
+     * @return response entity indicating the cancellation status
+     */
+    @DeleteMapping("/{invitationId}")
+    public ResponseEntity<?> cancelInvite(@PathVariable UUID invitationId) {
+        invitationService.cancelInvite(invitationId);
+        return ResponseEntity.ok("Invitation cancelled");
+    }
 }

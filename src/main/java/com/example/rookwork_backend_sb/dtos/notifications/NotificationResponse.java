@@ -22,6 +22,8 @@ public class NotificationResponse {
     private UUID issueId;
     private String issueName;
     private UUID invitationId;
+    private String invitationStatus;
+    private UUID projectId;
     private boolean isRead;
     private Instant createdAt;
 }
