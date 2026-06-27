@@ -7,14 +7,18 @@ import com.example.rookwork_backend_sb.dtos.user.UpdateProfileRequest;
 import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
+import java.security.SecureRandom;
 
+import com.example.rookwork_backend_sb.dtos.user.SetupPasswordRequest;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final S3Service s3Service;
+    private final EmailService emailService;
 
     public void updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = getUserOrThrow(userId);
@@ -172,4 +177,51 @@ public class UserService {
         }
         userRepository.delete(user);
     }
+
+    public void requestPasswordSetupOtp(UUID userId) {
+        User user = getUserOrThrow(userId);
+        if (user.getPasswordHash() != null) {
+            throw new BadRequestException("User already has a password set");
+        }
+        if (user.getSetupPasswordOtpExpiresAt() != null) {
+            Instant oneMinuteAgo = Instant.now().minus(1, java.time.temporal.ChronoUnit.MINUTES);
+            Instant requestedAt = user.getSetupPasswordOtpExpiresAt().minus(10, java.time.temporal.ChronoUnit.MINUTES);
+
+            if (requestedAt.isAfter(oneMinuteAgo)) {
+                throw new BadRequestException("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại OTP.");
+            }
+        }
+        // Tạo mã OTP 6 số
+        SecureRandom random = new SecureRandom();
+        int otpNum = 100000 + random.nextInt(900000);
+        String otp = String.valueOf(otpNum);
+        user.setSetupPasswordOtp(passwordEncoder.encode(otp));
+        user.setSetupPasswordOtpExpiresAt(Instant.now().plus(10, java.time.temporal.ChronoUnit.MINUTES));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+        emailService.sendPasswordSetupOtp(user.getEmail(), otp);
+    }
+
+    public void setupPasswordWithOtp(UUID userId, SetupPasswordRequest request) {
+        User user = getUserOrThrow(userId);
+        if (user.getPasswordHash() != null) {
+            throw new BadRequestException("User already has a password set");
+        }
+        if (user.getSetupPasswordOtp() == null || user.getSetupPasswordOtpExpiresAt() == null) {
+            throw new BadRequestException("OTP not requested or expired");
+        }
+        if (Instant.now().isAfter(user.getSetupPasswordOtpExpiresAt())) {
+            throw new BadRequestException("OTP has expired");
+        }
+        if (!passwordEncoder.matches(request.getOtp(), user.getSetupPasswordOtp())) {
+            throw new BadRequestException("Invalid OTP");
+        }
+        validatePasswordStrength(request.getNewPassword());
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setSetupPasswordOtp(null);
+        user.setSetupPasswordOtpExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
 }

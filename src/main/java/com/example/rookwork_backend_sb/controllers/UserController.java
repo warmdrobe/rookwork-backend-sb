@@ -66,6 +66,7 @@ public class UserController {
         .notifyMentioned(user.isNotifyMentioned())
         .notifyProjectUpdates(user.isNotifyProjectUpdates())
         .notifyDailyDigest(user.isNotifyDailyDigest())
+        .hasPassword(user.getPasswordHash() != null)
         .build());
   }
 
@@ -113,9 +114,25 @@ public class UserController {
   }
 
   @org.springframework.web.bind.annotation.DeleteMapping("/me")
-  public ResponseEntity<Void> deleteAccount(@RequestBody com.example.rookwork_backend_sb.dtos.user.DeleteAccountRequest request) {
+  public ResponseEntity<Void> deleteAccount(
+      @RequestBody com.example.rookwork_backend_sb.dtos.user.DeleteAccountRequest request) {
     UUID userId = securityUtil.getCurrentUserId();
     userService.deleteAccount(userId, request);
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/me/password/setup-otp")
+  public ResponseEntity<Void> requestPasswordSetupOtp() {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.requestPasswordSetupOtp(userId);
+    return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/me/password/setup")
+  public ResponseEntity<Void> setupPasswordWithOtp(
+      @RequestBody com.example.rookwork_backend_sb.dtos.user.SetupPasswordRequest request) {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.setupPasswordWithOtp(userId, request);
+    return ResponseEntity.ok().build();
   }
 }

@@ -32,7 +32,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /**
- * Service class handling user authentication, registration, and token refresh logic.
+ * Service class handling user authentication, registration, and token refresh
+ * logic.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,11 +50,12 @@ public class AuthService {
     private String googleClientId;
 
     /**
-     * Authenticates a user with email and password, and returns access and refresh tokens.
+     * Authenticates a user with email and password, and returns access and refresh
+     * tokens.
      *
      * @param dto the login request credentials
      * @return the authentication response containing tokens
-     * @throws UnauthorizedException if credentials are invalid
+     * @throws UnauthorizedException     if credentials are invalid
      * @throws ResourceNotFoundException if user doesn't exist
      */
     public AuthResponse login(LoginRequest dto) {
@@ -61,9 +64,7 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             dto.getEmail(),
-                            dto.getPassword()
-                    )
-            );
+                            dto.getPassword()));
         } catch (BadCredentialsException e) {
             throw new UnauthorizedException("Invalid email or password");
         }
@@ -83,7 +84,8 @@ public class AuthService {
      *
      * @param dto the registration details
      * @return the authentication response containing tokens for the new user
-     * @throws ConflictException if the email is already registered or invalid format
+     * @throws ConflictException if the email is already registered or invalid
+     *                           format
      */
     public AuthResponse register(AuthRegister dto) {
         if (!dto.getEmail().matches("^[a-zA-Z0-9._%+-]+@gmail\\.com$")) {
@@ -107,6 +109,7 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        emailService.sendWelcomeEmail(user.getEmail(), user.getProfileName());
 
         return generateTokens(user);
     }
@@ -121,11 +124,11 @@ public class AuthService {
     public AuthResponse refresh(String refreshToken) {
         // Retrieve the user matching the hashed refresh token
         User user = userRepository.findByRefreshTokenHash(
-                        hashToken(refreshToken))
+                hashToken(refreshToken))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
         // Validate that the refresh token is still within its expiration window
-        if (user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
+        if (user.getRefreshTokenExpiresAt() == null || user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
             throw new UnauthorizedException("Refresh token expired");
         }
 
@@ -140,13 +143,14 @@ public class AuthService {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             String result = hexString.toString();
             return result;
         } catch (NoSuchAlgorithmException e) {
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR,"Error hashing token");
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Error hashing token");
         }
     }
 
@@ -170,8 +174,12 @@ public class AuthService {
             throw new UnauthorizedException("Google token does not contain email");
         }
 
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
-            User newUser = User.builder()
+        boolean isNewUser = false;
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            isNewUser = true;
+            user = User.builder()
                     .email(email)
                     .profileName(name != null ? name : email.split("@")[0])
                     .picture(picture)
@@ -181,8 +189,8 @@ public class AuthService {
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
                     .build();
-            return userRepository.save(newUser);
-        });
+            user = userRepository.save(user);
+        }
 
         boolean updated = false;
         // Always sync the latest Google avatar URL on each login
@@ -199,6 +207,9 @@ public class AuthService {
             userRepository.save(user);
         }
 
+        if (isNewUser) {
+            emailService.sendWelcomeEmail(user.getEmail(), user.getProfileName());
+        }
         return generateTokens(user);
     }
 
@@ -227,6 +238,8 @@ public class AuthService {
 
             return payload;
         } catch (Exception e) {
+
+
             if (e instanceof UnauthorizedException) {
                 throw (UnauthorizedException) e;
             }
@@ -234,4 +247,3 @@ public class AuthService {
         }
     }
 }
-
