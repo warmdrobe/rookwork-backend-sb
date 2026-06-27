@@ -147,10 +147,19 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>ses</artifactId>
         </dependency>
+
+        <!-- Rate Limiting: token-bucket algorithm for API throttling -->
         <dependency>
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j-core</artifactId>
-            <version>8.1.0</version>
+            <version>8.10.1</version>
+        </dependency>
+
+        <!-- XSS Prevention: sanitize user-submitted HTML before persistence -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.3</version>
         </dependency>
     </dependencies>
 

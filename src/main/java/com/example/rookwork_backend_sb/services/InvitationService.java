@@ -53,6 +53,7 @@ public class InvitationService {
      * @throws ResourceNotFoundException if user or project is not found
      * @throws ConflictException if user is already a member or invitation is already pending
      */
+    @org.springframework.transaction.annotation.Transactional
     public void sendInvite(UUID projectId, String invitedEmail) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -74,9 +75,18 @@ public class InvitationService {
             throw new ConflictException("User is already a member");
 
         // Prevent duplicate invitations to the same user
-        if (invitationRepository.findByProjectIdAndInvitedUserId(
-                projectId, invitedUser.getId()).isPresent())
-            throw new ConflictException("Invitation already sent");
+        invitationRepository.findByProjectIdAndInvitedUserId(projectId, invitedUser.getId())
+                .ifPresent(existingInvite -> {
+                    if (existingInvite.getStatus() == InvitationStatus.PENDING) {
+                        throw new ConflictException("Invitation already sent");
+                    } else {
+                        // Delete notifications pointing to the old invitation
+                        notificationRepository.deleteByInvitationId(existingInvite.getId());
+                        // Delete the old invitation record
+                        invitationRepository.delete(existingInvite);
+                        invitationRepository.flush();
+                    }
+                });
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
@@ -90,7 +100,6 @@ public class InvitationService {
                 .updatedAt(Instant.now())
                 .build();
         invitationRepository.save(invitation);
-
         // Send a real-time and persistent notification to the invited user
         Notification notification = Notification.builder()
                 .user(invitedUser)
@@ -105,22 +114,48 @@ public class InvitationService {
                 .build();
         notificationRepository.save(notification);
 
-        messagingTemplate.convertAndSendToUser(
-                invitedUser.getId().toString(),
-                "/queue/notifications",
-                Map.of(
-                        "type", "INVITATION",
-                        "notificationId", notification.getId(),
-                        "invitationId", invitation.getId(),
-                        "projectName", project.getProjectName(),
-                        "invitedBy", sender.getUser().getProfileName()
-                )
-        );
-        emailService.sendProjectInvitation(
-                invitedUser.getEmail(),
-                project.getProjectName(),
-                sender.getUser().getProfileName()
-        );
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        messagingTemplate.convertAndSendToUser(
+                                invitedUser.getId().toString(),
+                                "/queue/notifications",
+                                Map.of(
+                                        "type", "INVITATION",
+                                        "notificationId", notification.getId(),
+                                        "invitationId", invitation.getId(),
+                                        "projectName", project.getProjectName(),
+                                        "invitedBy", sender.getUser().getProfileName()
+                                )
+                        );
+                        emailService.sendProjectInvitation(
+                                invitedUser.getEmail(),
+                                project.getProjectName(),
+                                sender.getUser().getProfileName()
+                        );
+                    }
+                }
+            );
+        } else {
+            messagingTemplate.convertAndSendToUser(
+                    invitedUser.getId().toString(),
+                    "/queue/notifications",
+                    Map.of(
+                            "type", "INVITATION",
+                            "notificationId", notification.getId(),
+                            "invitationId", invitation.getId(),
+                            "projectName", project.getProjectName(),
+                            "invitedBy", sender.getUser().getProfileName()
+                    )
+            );
+            emailService.sendProjectInvitation(
+                    invitedUser.getEmail(),
+                    project.getProjectName(),
+                    sender.getUser().getProfileName()
+            );
+        }
     }
 
     /**
@@ -132,6 +167,7 @@ public class InvitationService {
      * @throws ForbiddenException if the invitation was not addressed to the current user
      * @throws ConflictException if the invitation status is not PENDING
      */
+    @org.springframework.transaction.annotation.Transactional
     public void respondInvite(UUID invitationId, boolean accept) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
@@ -178,18 +214,40 @@ public class InvitationService {
                 .build();
         notificationRepository.save(notification);
 
-        messagingTemplate.convertAndSendToUser(
-                invitation.getInvitedBy().getId().toString(),
-                "/queue/notifications",
-                Map.of(
-                        "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
-                        "notificationId", notification.getId(),
-                        "invitationId", invitation.getId(),
-                        "projectId", invitation.getProject().getId(),
-                        "projectName", invitation.getProject().getProjectName(),
-                        "respondedBy", invitation.getInvitedUser().getProfileName()
-                )
-        );
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        messagingTemplate.convertAndSendToUser(
+                                invitation.getInvitedBy().getId().toString(),
+                                "/queue/notifications",
+                                Map.of(
+                                        "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
+                                        "notificationId", notification.getId(),
+                                        "invitationId", invitation.getId(),
+                                        "projectId", invitation.getProject().getId(),
+                                        "projectName", invitation.getProject().getProjectName(),
+                                        "respondedBy", invitation.getInvitedUser().getProfileName()
+                                )
+                        );
+                    }
+                }
+            );
+        } else {
+            messagingTemplate.convertAndSendToUser(
+                    invitation.getInvitedBy().getId().toString(),
+                    "/queue/notifications",
+                    Map.of(
+                            "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
+                            "notificationId", notification.getId(),
+                            "invitationId", invitation.getId(),
+                            "projectId", invitation.getProject().getId(),
+                            "projectName", invitation.getProject().getProjectName(),
+                            "respondedBy", invitation.getInvitedUser().getProfileName()
+                    )
+            );
+        }
     }
 
     /**
@@ -212,5 +270,65 @@ public class InvitationService {
                         .createdAt(inv.getCreatedAt())
                         .build())
                 .toList();
+    }
+
+    /**
+     * Retrieves all pending invitations for a specific project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return a list of InvitationResponse DTOs representing pending invitations for the project
+     */
+    public List<InvitationResponse> getPendingInvitesForProject(UUID projectId) {
+        return invitationRepository
+                .findByProjectIdAndStatus(projectId, InvitationStatus.PENDING)
+                .stream()
+                .map(inv -> InvitationResponse.builder()
+                        .id(inv.getId())
+                        .projectId(inv.getProject().getId())
+                        .projectName(inv.getProject().getProjectName())
+                        .invitedById(inv.getInvitedBy().getId())
+                        .invitedByName(inv.getInvitedBy().getProfileName())
+                        .invitedUserId(inv.getInvitedUser().getId())
+                        .invitedUserName(inv.getInvitedUser().getProfileName())
+                        .invitedUserEmail(inv.getInvitedUser().getEmail())
+                        .invitedUserPicture(inv.getInvitedUser().getPicture())
+                        .status(inv.getStatus().name())
+                        .createdAt(inv.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Cancels a pending project invitation.
+     *
+     * @param invitationId the unique identifier of the invitation to cancel
+     * @throws ResourceNotFoundException if the invitation is not found
+     * @throws ForbiddenException if current user is not project owner
+     * @throws ConflictException if invitation status is not PENDING
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void cancelInvite(UUID invitationId) {
+        UUID currentUserId = securityUtil.getCurrentUserId();
+
+        Invitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
+
+        if (invitation.getStatus() != InvitationStatus.PENDING)
+            throw new ConflictException("Can only cancel pending invitations");
+
+        // Verify sender is project owner
+        UUID projectId = invitation.getProject().getId();
+        ProjectMember sender = projectMemberRepository
+                .findById(new ProjectMemberId(currentUserId, projectId))
+                .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
+
+        if (sender.getRole() != ProjectRole.OWNER)
+            throw new ForbiddenException("Only OWNER can cancel invitations");
+
+        // Delete notifications first
+        notificationRepository.deleteByInvitationId(invitationId);
+
+        // Delete invitation
+        invitationRepository.delete(invitation);
     }
 }

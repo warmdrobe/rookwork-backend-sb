@@ -15,6 +15,10 @@ public class InvitationResponse {
     private String projectName;
     private UUID invitedById;
     private String invitedByName;
+    private UUID invitedUserId;
+    private String invitedUserName;
+    private String invitedUserEmail;
+    private String invitedUserPicture;
     private String status;
     private Instant createdAt;
 }
