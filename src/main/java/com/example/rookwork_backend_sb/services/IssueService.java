@@ -2,6 +2,7 @@ package com.example.rookwork_backend_sb.services;
 
 import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.dtos.issues.*;
+import com.example.rookwork_backend_sb.dtos.subtasks.SubTaskResponse;
 import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
@@ -495,6 +496,21 @@ public class IssueService {
             }).collect(Collectors.toList());
         }
         response.setAttachments(attachments);
+
+        List<SubTaskResponse> subtasks = new ArrayList<>();
+        if (issue.getSubtasks() != null) {
+            subtasks = issue.getSubtasks().stream().map(sub -> SubTaskResponse.builder()
+                    .id(sub.getId())
+                    .subtaskName(sub.getSubtaskName())
+                    .subtaskDescription(sub.getSubtaskDescription())
+                    .isDone(sub.isDone())
+                    .issueId(sub.getIssue().getId())
+                    .createdAt(sub.getCreatedAt())
+                    .updatedAt(sub.getUpdatedAt())
+                    .build()
+            ).collect(Collectors.toList());
+        }
+        response.setSubtasks(subtasks);
 
         return response;
     }
