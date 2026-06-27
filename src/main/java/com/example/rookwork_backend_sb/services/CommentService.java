@@ -37,6 +37,8 @@ import com.example.rookwork_backend_sb.security.SecurityUtil;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 
@@ -88,7 +90,7 @@ public class CommentService {
         }
 
         Comment comment = Comment.builder()
-                .content(request.getContent())
+                .content(sanitizeHtml(request.getContent()))
                 .issue(issue)
                 .user(currentUser)
                 .parentComment(parent)
@@ -275,7 +277,7 @@ public class CommentService {
         if (!comment.getUser().getId().equals(currentUserId))
             throw new ForbiddenException("You can only edit your own comment");
 
-        comment.setContent(request.getContent());
+        comment.setContent(sanitizeHtml(request.getContent()));
         comment.setUpdatedAt(Instant.now());
         commentRepository.save(comment);
 
@@ -422,5 +424,20 @@ public class CommentService {
         }
 
         return response;
+    }
+
+    /**
+     * Sanitizes user-submitted HTML to prevent XSS Stored attacks.
+     * Preserves safe rich-text formatting (bold, italic, links, images)
+     * while stripping {@code <script>} tags and event handler attributes.
+     *
+     * @param html raw HTML input (may be null)
+     * @return sanitized HTML, or null if input was null
+     */
+    private String sanitizeHtml(String html) {
+        if (html == null) {
+            return null;
+        }
+        return Jsoup.clean(html, Safelist.basicWithImages());
     }
 }
