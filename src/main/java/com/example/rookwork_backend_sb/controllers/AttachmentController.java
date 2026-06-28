@@ -36,4 +36,12 @@ public class AttachmentController {
         attachmentService.deleteAttachment(projectId, issueId, fileId);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{fileId}/move/{targetIssueId}")
+    public ResponseEntity<AttachmentResponse> moveAttachment(
+            @PathVariable UUID projectId,
+            @PathVariable UUID fileId,
+            @PathVariable UUID targetIssueId) {
+        return ResponseEntity.ok(attachmentService.moveAttachment(projectId, fileId, targetIssueId));
+    }
 }
