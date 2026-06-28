@@ -126,6 +126,30 @@ public class AttachmentService {
     }
 
     /**
+     * Moves a file attachment to a different target issue.
+     */
+    @Transactional
+    public AttachmentResponse moveAttachment(UUID projectId, UUID fileId, UUID targetIssueId) {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));
+
+        Issue targetIssue = issueRepository.findById(targetIssueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target issue not found"));
+
+        // Verify target issue belongs to the project
+        if (!targetIssue.getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Target issue does not belong to this project");
+        }
+
+        file.setIssue(targetIssue);
+        file.setUpdatedAt(Instant.now());
+        File saved = fileRepository.save(file);
+
+        String presignedUrl = s3Service.generatePresignedUrl(saved.getStoredName());
+        return mapToResponse(saved, presignedUrl);
+    }
+
+    /**
      * Maps a File entity to AttachmentResponse DTO.
      */
     public AttachmentResponse mapToResponse(File file, String presignedUrl) {
