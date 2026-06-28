@@ -5,7 +5,7 @@ FROM eclipse-temurin:21-jdk
 WORKDIR /app
 
 # Copy form virtual to Container
-COPY target/rookwork-backend-sb-0.0.1-SNAPSHOT.jar app.jar
+COPY rookwork-backend.jar app.jar
 
 # Port
 EXPOSE 8080
