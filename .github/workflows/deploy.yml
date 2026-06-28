@@ -49,8 +49,8 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --region ap-southeast-1 \
             --parameters 'commands=[
-              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar ~/rookwork-backend-sb/rookwork-backend.jar",
-              "cd ~/rookwork-backend-sb",
+              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar",
+              "cd /home/ec2-user/rookwork-backend-sb",
               "sudo docker stop rookwork-backend || true",
               "sudo docker rm rookwork-backend || true",
               "sudo docker rmi rookwork-backend:${{ steps.version.outputs.VERSION }} || true",
@@ -65,8 +65,8 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --region ap-southeast-1 \
             --parameters 'commands=[
-              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar ~/rookwork-backend-sb/rookwork-backend.jar",
-              "cd ~/rookwork-backend-sb",
+              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar",
+              "cd /home/ec2-user/rookwork-backend-sb",
               "sudo docker stop rookwork-backend || true",
               "sudo docker rm rookwork-backend || true",
               "sudo docker rmi rookwork-backend:${{ steps.version.outputs.VERSION }} || true",
