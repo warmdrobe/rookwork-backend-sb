@@ -177,7 +177,8 @@ public class AuthService {
         });
 
         boolean updated = false;
-        if (user.getPicture() == null && picture != null) {
+        // Always sync the latest Google avatar URL on each login
+        if (picture != null && !picture.equals(user.getPicture())) {
             user.setPicture(picture);
             updated = true;
         }

@@ -2,6 +2,7 @@ package com.example.rookwork_backend_sb.services;
 
 import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.dtos.issues.*;
+import com.example.rookwork_backend_sb.dtos.subtasks.SubTaskResponse;
 import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
@@ -11,11 +12,14 @@ import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +39,7 @@ public class IssueService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
+    private final S3Service s3Service;
 
     /**
      * Creates a new issue in a project and logs the creation activity.
@@ -50,10 +55,6 @@ public class IssueService {
     public IssueResponse createIssue(UUID projectId, CreateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Verify the creator is a member of the project
-        if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
@@ -62,7 +63,7 @@ public class IssueService {
 
         Issue issue = Issue.builder()
                 .issueName(request.getIssueName())
-                .description(request.getDescription())
+                .description(sanitizeHtml(request.getDescription()))
                 .issueType(request.getIssueType())
                 .priority(request.getPriority())
                 .status(request.getStatus())
@@ -83,6 +84,7 @@ public class IssueService {
                 ActivityEntityType.ISSUE,
                 issue.getId(),
                 issue.getIssueName(),
+                issue,
                 null
         );
 
@@ -104,10 +106,6 @@ public class IssueService {
     public IssueResponse updateIssue(UUID projectId, UUID issueId, UpdateIssueRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Verify project membership
-        if(!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
@@ -119,115 +117,190 @@ public class IssueService {
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
         Status oldStatus = issue.getStatus();
-        UUID oldAssigneeId = issue.getAssignedTo() != null ? issue.getAssignedTo().getId() : null;
+        List<UUID> oldAssigneeIds = issue.getAssignees().stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
+
+        boolean nameChanged = false;
+        boolean descriptionChanged = false;
+        boolean priorityChanged = false;
+        boolean deadlineChanged = false;
+        boolean assigneesChanged = false;
+        boolean statusChanged = false;
+        boolean parentChanged = false;
 
         // Conditionally update updated fields
         if (request.getIssueName() != null) {
-            issue.setIssueName(request.getIssueName());
+            if (request.getIssueName().trim().isEmpty()) {
+                throw new BadRequestException("Issue name cannot be empty");
+            }
+            String newName = request.getIssueName();
+            if (!newName.equals(issue.getIssueName())) {
+                issue.setIssueName(newName);
+                nameChanged = true;
+            }
+        }
+
+        if (request.getIssueType() != null) {
+            issue.setIssueType(request.getIssueType());
         }
 
         if (request.getDescription() != null) {
-            issue.setDescription(request.getDescription());
+            String newDesc = sanitizeHtml(request.getDescription());
+            String oldDesc = issue.getDescription();
+            if (oldDesc == null ? newDesc != null : !oldDesc.equals(newDesc)) {
+                issue.setDescription(newDesc);
+                descriptionChanged = true;
+            }
         }
 
         if (request.getPriority() != null) {
-            issue.setPriority(request.getPriority());
+            PriorityType newPriority = request.getPriority();
+            if (newPriority != issue.getPriority()) {
+                issue.setPriority(newPriority);
+                priorityChanged = true;
+            }
         }
 
         if (request.getDeadline() != null) {
-            issue.setDeadline(request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant());
+            Instant newDeadline = request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant oldDeadline = issue.getDeadline();
+            if (oldDeadline == null ? newDeadline != null : !oldDeadline.equals(newDeadline)) {
+                issue.setDeadline(newDeadline);
+                deadlineChanged = true;
+            }
         }
 
         // Parent issue validation
         if (request.getParentId() != null) {
-            Issue parent = issueRepository
-                    .findByIdAndProjectId(request.getParentId(), projectId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Parent issue not found"));
-            if (parent.getId().equals(issue.getId())) {
-                throw new BadRequestException("Issue cannot be its own parent");
+            UUID newParentId = request.getParentId();
+            UUID oldParentId = issue.getParent() != null ? issue.getParent().getId() : null;
+            if (newParentId == null ? oldParentId != null : !newParentId.equals(oldParentId)) {
+                if (newParentId != null) {
+                    Issue parent = issueRepository
+                            .findByIdAndProjectId(newParentId, projectId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Parent issue not found"));
+                    if (parent.getId().equals(issue.getId())) {
+                        throw new BadRequestException("Issue cannot be its own parent");
+                    }
+                    issue.setParent(parent);
+                } else {
+                    issue.setParent(null);
+                }
+                parentChanged = true;
             }
-            issue.setParent(parent);
-        } else {
-            issue.setParent(null);
         }
 
-        if (request.getAssignedToId() != null) {
-            User assignee = userRepository.findById(request.getAssignedToId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
-            issue.setAssignedTo(assignee);
+        if (request.getAssigneeIds() != null) {
+            List<UUID> newIds = request.getAssigneeIds();
+            List<UUID> currentIds = issue.getAssignees().stream()
+                    .map(User::getId)
+                    .collect(Collectors.toList());
+            if (!newIds.equals(currentIds)) {
+                List<User> newAssignees = new ArrayList<>();
+                for (UUID uid : newIds) {
+                    User assignee = userRepository.findById(uid)
+                            .orElseThrow(() -> new ResourceNotFoundException("Assignee not found: " + uid));
+                    newAssignees.add(assignee);
+                }
+                issue.setAssignees(newAssignees);
+                assigneesChanged = true;
+            }
         }
 
         if (request.getStatus() != null) {
-            issue.setStatus(request.getStatus());
+            Status newStatus = request.getStatus();
+            if (newStatus != oldStatus) {
+                issue.setStatus(newStatus);
+                statusChanged = true;
+            }
         }
 
-        issue.setUpdatedAt(Instant.now());
-        issueRepository.save(issue);
+        boolean isAnyFieldChanged = nameChanged || descriptionChanged || priorityChanged || deadlineChanged || assigneesChanged || statusChanged || parentChanged;
 
-        // Broadcast the issue update via WebSocket to project subscribers
-        String dest = "/topic/project/" + projectId + "/issues";
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("type", "ISSUE_UPDATED");
-        payload.put("issue", getIssueResponse(projectId, issue));
-        messagingTemplate.convertAndSend(dest, (Object) payload);
+        if (isAnyFieldChanged) {
+            issue.setUpdatedAt(Instant.now());
+            issueRepository.save(issue);
 
-        // Handle assignee change activity log and push notifications
-        if (request.getAssignedToId() != null
-                && !request.getAssignedToId().equals(oldAssigneeId)
-                && !request.getAssignedToId().equals(currentUserId))  {
-            User assignee = issue.getAssignedTo();
+            // Broadcast the issue update via WebSocket to project subscribers
+            String dest = "/topic/project/" + projectId + "/issues";
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "ISSUE_UPDATED");
+            payload.put("issue", getIssueResponse(projectId, issue));
+            messagingTemplate.convertAndSend(dest, (Object) payload);
+        }
 
-            activityService.log(
-                    project, currentUser,
-                    ActivityAction.ASSIGNED,
-                    ActivityEntityType.ISSUE,
-                    issue.getId(),
-                    issue.getIssueName(),
-                    Map.of(
-                            "assigned_to_id", assignee.getId().toString(),
-                            "assigned_to_name", assignee.getProfileName()
-                    )
-            );
+        // Handle assignees change activity log and push notifications
+        if (assigneesChanged) {
+            List<User> currentAssignees = issue.getAssignees();
+            if (!currentAssignees.isEmpty()) {
+                // Notify newly added assignees (not in old list)
+                for (User assignee : currentAssignees) {
+                    if (!oldAssigneeIds.contains(assignee.getId()) && !assignee.getId().equals(currentUserId)) {
+                        activityService.log(
+                                project, currentUser,
+                                ActivityAction.ASSIGNED,
+                                ActivityEntityType.ISSUE,
+                                issue.getId(),
+                                issue.getIssueName(),
+                                Map.of(
+                                        "assigned_to_id", assignee.getId().toString(),
+                                        "assigned_to_name", assignee.getProfileName()
+                                )
+                        );
 
-            Notification notification = Notification.builder()
-                    .user(assignee)
-                    .sender(currentUser)
-                    .issue(issue)
-                    .title("You have been assigned to an issue")
-                    .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
-                            currentUser.getProfileName(),
-                            issue.getIssueName(),
-                            project.getProjectName()))
-                    .isRead(false)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
+                        Notification notification = Notification.builder()
+                                .user(assignee)
+                                .sender(currentUser)
+                                .issue(issue)
+                                .title("You have been assigned to an issue")
+                                .message(String.format("%s assigned you to \"%s\" in project \"%s\"",
+                                        currentUser.getProfileName(),
+                                        issue.getIssueName(),
+                                        project.getProjectName()))
+                                .isRead(false)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .build();
 
-            notificationRepository.save(notification);
+                        notificationRepository.save(notification);
 
-            messagingTemplate.convertAndSendToUser(
-                    assignee.getId().toString(),
-                    "/queue/notifications",
-                    Map.of(
-                            "type", "ASSIGNED",
-                            "notificationId", notification.getId(),
-                            "issueId", issue.getId(),
-                            "issueName", issue.getIssueName(),
-                            "projectName", project.getProjectName(),
-                            "assignedBy", currentUser.getProfileName()
-                    )
-            );
+                        messagingTemplate.convertAndSendToUser(
+                                assignee.getId().toString(),
+                                "/queue/notifications",
+                                Map.of(
+                                        "type", "ASSIGNED",
+                                        "notificationId", notification.getId(),
+                                        "issueId", issue.getId(),
+                                        "issueName", issue.getIssueName(),
+                                        "projectName", project.getProjectName(),
+                                        "assignedBy", currentUser.getProfileName()
+                                )
+                        );
+                    }
+                }
+            } else {
+                activityService.log(
+                        project, currentUser,
+                        ActivityAction.UPDATED,
+                        ActivityEntityType.ISSUE,
+                        issue.getId(),
+                        issue.getIssueName(),
+                        Map.of("field", "assignees", "to", "Unassigned")
+                );
+            }
         }
 
         // Log status change activity
-        if (request.getStatus() != null && request.getStatus() != oldStatus) {
-            if (request.getStatus() == Status.DONE) {
+        if (statusChanged) {
+            if (issue.getStatus() == Status.DONE) {
                 activityService.log(
                         project, currentUser,
                         ActivityAction.COMPLETED,
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
+                        issue,
                         null
                 );
             } else {
@@ -237,53 +310,65 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
-                        Map.of("from", oldStatus.name(), "to", request.getStatus().name())
+                        Map.of("from", oldStatus.name(), "to", issue.getStatus().name())
                 );
             }
         }
 
-        // Log other modifications (priority, name, description, deadline) if changed
-        if (request.getPriority() != null) {
+        // Log other modifications  (priority, name, description, deadline) if changed
+        if (priorityChanged) {
             activityService.log(
                     project, currentUser,
                     ActivityAction.UPDATED,
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    Map.of("field", "priority", "to", request.getPriority().name())
+                    Map.of("field", "priority", "to", issue.getPriority().name())
             );
         }
 
-        if (request.getIssueName() != null) {
+        if (nameChanged) {
             activityService.log(
                     project, currentUser,
                     ActivityAction.UPDATED,
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    Map.of("field", "name", "to", request.getIssueName())
+                    Map.of("field", "name", "to", issue.getIssueName())
             );
         }
 
-        if (request.getDescription() != null) {
+        if (descriptionChanged) {
             activityService.log(
                     project, currentUser,
                     ActivityAction.UPDATED,
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    Map.of("field", "description", "to", request.getDescription())
+                    Map.of("field", "description", "to", issue.getDescription() != null ? issue.getDescription() : "")
+
             );
         }
 
-        if (request.getDeadline() != null) {
+        if (deadlineChanged) {
             activityService.log(
                     project, currentUser,
                     ActivityAction.UPDATED,
                     ActivityEntityType.ISSUE,
                     issue.getId(),
                     issue.getIssueName(),
-                    Map.of("field", "deadline", "to", request.getDeadline().toString())
+                    Map.of("field", "deadline", "to", issue.getDeadline() != null ? issue.getDeadline().toString() : "None")
+            );
+        }
+
+        if (parentChanged) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    Map.of("field", "parent", "to", issue.getParent() != null ? issue.getParent().getIssueName() : "None")
             );
         }
 
@@ -298,22 +383,29 @@ public class IssueService {
      * @throws ForbiddenException if current user is not a member or not the project owner
      * @throws ResourceNotFoundException if the issue is not found
      */
+    @Transactional
     public void deleteIssue(UUID projectId, UUID issueId) {
 
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        ProjectMember member = projectMemberRepository
-                .findById(new ProjectMemberId(currentUserId, projectId))
-                .orElseThrow(() -> new ForbiddenException("Not a member of project"));
-
-        // Only the project owner can delete issues
-        if (member.getRole() != ProjectRole.OWNER) {
-            throw new ForbiddenException("Only OWNER can delete issue");
-        }
-
         Issue issue = issueRepository
                 .findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log issue deletion activity (passing null for issue to prevent ON DELETE CASCADE from removing the log)
+        activityService.log(
+                issue.getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.ISSUE,
+                issue.getId(),
+                issue.getIssueName(),
+                null,
+                null
+        );
 
         issueRepository.delete(issue);
     }
@@ -327,8 +419,6 @@ public class IssueService {
      */
     public List<IssueResponse> getAllIssue(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
         return issueRepository.findAllByProjectId(projectId)
                 .stream()
                 .map(issue -> getIssueResponse(projectId, issue))
@@ -342,7 +432,7 @@ public class IssueService {
      */
     public List<IssueResponse> getAllByAssignedToId() {
         UUID currentUserId = securityUtil.getCurrentUserId();
-        return issueRepository.findAllByAssignedToId(currentUserId)
+        return issueRepository.findAllByAssigneeId(currentUserId)
                 .stream()
                 .map(issue -> getIssueResponse(issue.getProject().getId(), issue))
                 .collect(Collectors.toList());
@@ -363,7 +453,7 @@ public class IssueService {
     }
 
     // issue mapping
-    private static IssueResponse getIssueResponse(UUID projectId, Issue issue) {
+    private IssueResponse getIssueResponse(UUID projectId, Issue issue) {
         IssueResponse response = new IssueResponse();
         response.setId(issue.getId());
         response.setIssueName(issue.getIssueName());
@@ -377,14 +467,66 @@ public class IssueService {
         response.setCreatedAt(issue.getCreatedAt());
         response.setUpdatedAt(issue.getUpdatedAt());
 
-        if (issue.getAssignedTo() != null) {
-            UserSummary assignee = new UserSummary();
-            assignee.setId(issue.getAssignedTo().getId());
-            assignee.setProfileName(issue.getAssignedTo().getProfileName());
-            assignee.setPicture(issue.getAssignedTo().getPicture());
-            response.setAssignedTo(assignee);
+        List<UserSummary> assignees = new ArrayList<>();
+        if (issue.getAssignees() != null) {
+            assignees = issue.getAssignees().stream().map(u -> {
+                UserSummary s = new UserSummary();
+                s.setId(u.getId());
+                s.setProfileName(u.getProfileName());
+                s.setPicture(s3Service.getAvatarUrl(u.getPicture()));
+                return s;
+            }).collect(Collectors.toList());
         }
+        response.setAssignees(assignees);
+
+        List<AttachmentResponse> attachments = new ArrayList<>();
+        if (issue.getAttachments() != null) {
+            attachments = issue.getAttachments().stream().map(file -> {
+                String presignedUrl = s3Service.generatePresignedUrl(file.getStoredName());
+                return AttachmentResponse.builder()
+                        .id(file.getId())
+                        .originalName(file.getOriginalName())
+                        .storedName(file.getStoredName())
+                        .mimeType(file.getMimeType())
+                        .sizeBytes(file.getSizeBytes())
+                        .uploadedBy(file.getUploadedBy())
+                        .createdAt(file.getCreatedAt())
+                        .presignedUrl(presignedUrl)
+                        .build();
+            }).collect(Collectors.toList());
+        }
+        response.setAttachments(attachments);
+
+        List<SubTaskResponse> subtasks = new ArrayList<>();
+        if (issue.getSubtasks() != null) {
+            subtasks = issue.getSubtasks().stream().map(sub -> SubTaskResponse.builder()
+                    .id(sub.getId())
+                    .subtaskName(sub.getSubtaskName())
+                    .subtaskDescription(sub.getSubtaskDescription())
+                    .isDone(sub.isDone())
+                    .issueId(sub.getIssue().getId())
+                    .createdAt(sub.getCreatedAt())
+                    .updatedAt(sub.getUpdatedAt())
+                    .build()
+            ).collect(Collectors.toList());
+        }
+        response.setSubtasks(subtasks);
 
         return response;
+    }
+
+    /**
+     * Sanitizes user-submitted HTML content to prevent XSS Stored attacks.
+     * Allows a safe subset of HTML tags and attributes (bold, italic, lists, links, images)
+     * produced by rich-text editors like Tiptap. Strips any {@code <script>} or event handler attributes.
+     *
+     * @param html raw HTML input from the client (may be null)
+     * @return sanitized HTML, or null if the input was null
+     */
+    private String sanitizeHtml(String html) {
+        if (html == null) {
+            return null;
+        }
+        return Jsoup.clean(html, Safelist.basicWithImages());
     }
 }

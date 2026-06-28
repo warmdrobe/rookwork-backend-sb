@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -22,10 +23,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
   private final JwtFilter jwtFilter;
+  private final RateLimitFilter rateLimitFilter;
   private final CustomUserDetailsService userDetailsService;
 
   @Bean
@@ -42,8 +45,9 @@ public class SecurityConfig {
             .requestMatchers("/ws/**").permitAll()
             .anyRequest().authenticated())
         .authenticationProvider(authenticationProvider())
-        .addFilterBefore(jwtFilter,
-            UsernamePasswordAuthenticationFilter.class);
+        // RateLimitFilter runs first to block brute-force before JWT processing
+        .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }

@@ -16,5 +16,8 @@ public class WorkLogResponse {
     public String userPicture;
     public BigDecimal hours;
     public Instant loggedAt;
+    public Instant startAt;
+    public Instant endAt;
+    public Instant createdAt;
     public String note;
 }

@@ -6,6 +6,7 @@ import com.example.rookwork_backend_sb.dtos.subtasks.UpdateSubTaskRequest;
 import com.example.rookwork_backend_sb.services.SubTaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("api/projects/{projectId}/issues/{issueId}/subtasks")
 @RequiredArgsConstructor
+@PreAuthorize("@projectSecurity.isMember(#projectId)")
 public class SubTaskController {
 
     private final SubTaskService subTaskService;

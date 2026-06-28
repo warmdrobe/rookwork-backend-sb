@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.invitations.SendInviteRequest;
 import com.example.rookwork_backend_sb.services.InvitationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -24,6 +25,7 @@ public class InvitationController {
      * @param request the invite details containing project ID and recipient email
      * @return response entity indicating the invite has been sent successfully
      */
+    @PreAuthorize("@projectSecurity.isOwner(#request.projectId)")
     @PostMapping("/send")
     public ResponseEntity<?> sendInvite(@RequestBody SendInviteRequest request) {
         invitationService.sendInvite(request.getProjectId(), request.getEmail());
@@ -53,5 +55,29 @@ public class InvitationController {
     @GetMapping("/pending")
     public ResponseEntity<?> getPending() {
         return ResponseEntity.ok(invitationService.getPendingInvites());
+    }
+
+    /**
+     * Retrieves all pending invitations for a specific project.
+     *
+     * @param projectId the unique identifier of the project
+     * @return response entity containing a list of pending invitations for the project
+     */
+    @PreAuthorize("@projectSecurity.isMember(#projectId)")
+    @GetMapping("/project/{projectId}/pending")
+    public ResponseEntity<?> getPendingForProject(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(invitationService.getPendingInvitesForProject(projectId));
+    }
+
+    /**
+     * Cancels/revokes a pending project invitation.
+     *
+     * @param invitationId the unique identifier of the invitation to cancel
+     * @return response entity indicating the cancellation status
+     */
+    @DeleteMapping("/{invitationId}")
+    public ResponseEntity<?> cancelInvite(@PathVariable UUID invitationId) {
+        invitationService.cancelInvite(invitationId);
+        return ResponseEntity.ok("Invitation cancelled");
     }
 }

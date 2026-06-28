@@ -5,6 +5,7 @@ import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
 import com.example.rookwork_backend_sb.services.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("api/projects/{projectId}")
 @RequiredArgsConstructor
+@PreAuthorize("@projectSecurity.isMember(#projectId)")
 public class CommentController {
     private final CommentService commentService;
 
@@ -90,7 +92,8 @@ public class CommentController {
      */
     @GetMapping("/issues/{issueId}/comments")
     public ResponseEntity<List<CommentResponse>> getAllCommentByIssueId(
+            @PathVariable UUID projectId,
             @PathVariable UUID issueId) {
-        return ResponseEntity.ok(commentService.getAllCommentByIssueId(issueId));
+        return ResponseEntity.ok(commentService.getAllCommentByIssueId(projectId, issueId));
     }
 }

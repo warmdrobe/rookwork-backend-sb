@@ -1,22 +1,44 @@
 package com.example.rookwork_backend_sb.services;
 
-import com.example.rookwork_backend_sb.dtos.UserSummary;
-import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
-import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
-import com.example.rookwork_backend_sb.entities.*;
-import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
-import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
-import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
-import com.example.rookwork_backend_sb.repositories.*;
-import com.example.rookwork_backend_sb.security.SecurityUtil;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.example.rookwork_backend_sb.dtos.UserSummary;
+import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
+import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
+import com.example.rookwork_backend_sb.entities.ActivityAction;
+import com.example.rookwork_backend_sb.entities.ActivityEntityType;
+import com.example.rookwork_backend_sb.entities.Comment;
+import com.example.rookwork_backend_sb.entities.Issue;
+import com.example.rookwork_backend_sb.entities.Notification;
+import com.example.rookwork_backend_sb.entities.Project;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
+import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
+import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
+import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
+import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.repositories.CommentRepository;
+import com.example.rookwork_backend_sb.repositories.IssueRepository;
+import com.example.rookwork_backend_sb.repositories.NotificationRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectRepository;
+import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.security.SecurityUtil;
+
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 
@@ -35,6 +57,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final S3Service s3Service;
     /**
      * Creates a new comment under an issue, logs activity, and sends notifications.
      *
@@ -49,10 +72,6 @@ public class CommentService {
     @Transactional
     public CommentResponse createComment(UUID projectId, UUID issueId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
-
-        // Check if the current user has permission to comment on this project
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
 
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
@@ -71,7 +90,7 @@ public class CommentService {
         }
 
         Comment comment = Comment.builder()
-                .content(request.getContent())
+                .content(sanitizeHtml(request.getContent()))
                 .issue(issue)
                 .user(currentUser)
                 .parentComment(parent)
@@ -88,6 +107,7 @@ public class CommentService {
                 ActivityEntityType.COMMENT,
                 comment.getId(),
                 issue.getIssueName(),
+                issue,
                 Map.of("preview", comment.getContent().length() > 50
                         ? comment.getContent().substring(0, 50) + "..."
                         : comment.getContent())
@@ -100,7 +120,7 @@ public class CommentService {
                 .user(UserSummary.builder()
                         .id(currentUser.getId())
                         .profileName(currentUser.getProfileName())
-                        .picture(currentUser.getPicture())
+                        .picture(s3Service.getAvatarUrl(currentUser.getPicture()))
                         .build())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
@@ -117,46 +137,45 @@ public class CommentService {
                 (Object) payload
         );
 
-        // Notify the issue assignee if the comment was written by someone else
-        if (issue.getAssignedTo() != null &&
-                !issue.getAssignedTo().getId().equals(currentUserId)) {
+        // Notify each assignee if the comment was written by someone else
+        for (User assignee : issue.getAssignees()) {
+            if (!assignee.getId().equals(currentUserId)) {
+                Notification notification = Notification.builder()
+                        .user(assignee)
+                        .sender(currentUser)
+                        .issue(issue)
+                        .title("New comment on your issue")
+                        .message(String.format("%s commented on \"%s\" in project \"%s\"",
+                                 currentUser.getProfileName(),
+                                 issue.getIssueName(),
+                                 project.getProjectName()))
+                        .isRead(false)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                notificationRepository.save(notification);
 
-            User assignee = issue.getAssignedTo();
-
-            Notification notification = Notification.builder()
-                    .user(assignee)
-                    .sender(currentUser)
-                    .issue(issue)
-                    .title("New comment on your issue")
-                    .message(String.format("%s commented on \"%s\" in project \"%s\"",
-                             currentUser.getProfileName(),
-                             issue.getIssueName(),
-                             project.getProjectName()))
-                    .isRead(false)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            notificationRepository.save(notification);
-
-            simpMessagingTemplate.convertAndSendToUser(
-                    assignee.getId().toString(),
-                    "/queue/notifications",
-                    Map.of(
-                            "type", "NEW_COMMENT",
-                            "notificationId", notification.getId(),
-                            "issueId", issue.getId(),
-                            "issueName", issue.getIssueName(),
-                            "projectName", project.getProjectName(),
-                            "commentBy", currentUser.getProfileName()
-                    )
-            );
+                simpMessagingTemplate.convertAndSendToUser(
+                        assignee.getId().toString(),
+                        "/queue/notifications",
+                        Map.of(
+                                "type", "NEW_COMMENT",
+                                "notificationId", notification.getId(),
+                                "issueId", issue.getId(),
+                                "issueName", issue.getIssueName(),
+                                "projectName", project.getProjectName(),
+                                "commentBy", currentUser.getProfileName()
+                        )
+                );
+            }
         }
 
-        // Notify the issue creator if they are not the author or assignee
+        // Notify the issue creator if they are not the author and not already an assignee
+        List<UUID> assigneeIds = issue.getAssignees().stream()
+                .map(User::getId).collect(java.util.stream.Collectors.toList());
         if (issue.getCreatedBy() != null &&
                 !issue.getCreatedBy().getId().equals(currentUserId) &&
-                (issue.getAssignedTo() == null ||
-                        !issue.getCreatedBy().getId().equals(issue.getAssignedTo().getId()))) {
+                !assigneeIds.contains(issue.getCreatedBy().getId())) {
 
             User issueCreator = issue.getCreatedBy();
 
@@ -192,8 +211,7 @@ public class CommentService {
         // Notify the author of the parent comment if this is a reply
         if (parent != null &&
                 !parent.getUser().getId().equals(currentUserId) &&
-                (issue.getAssignedTo() == null ||
-                        !parent.getUser().getId().equals(issue.getAssignedTo().getId())) &&
+                !assigneeIds.contains(parent.getUser().getId()) &&
                 (issue.getCreatedBy() == null ||
                         !parent.getUser().getId().equals(issue.getCreatedBy().getId()))) {
 
@@ -244,21 +262,22 @@ public class CommentService {
     public CommentResponse updateComment(UUID projectId, UUID issueId, UUID commentId, CreateCommentRequest request) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        // Check project membership
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UnauthorizedException("Not authentication"));
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
+
         // Verify that only the original author can edit the comment
         if (!comment.getUser().getId().equals(currentUserId))
             throw new ForbiddenException("You can only edit your own comment");
 
-        comment.setContent(request.getContent());
+        comment.setContent(sanitizeHtml(request.getContent()));
         comment.setUpdatedAt(Instant.now());
         commentRepository.save(comment);
 
@@ -287,11 +306,13 @@ public class CommentService {
     public void deleteComment(UUID projectId, UUID issueId, UUID commentId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Path consistency check: verify comment belongs to this issue and project
+        if (!comment.getIssue().getId().equals(issueId) || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
 
         ProjectMember currentMember = projectMemberRepository
                 .findById(new ProjectMemberId(currentUserId, projectId))
@@ -303,6 +324,21 @@ public class CommentService {
 
         if (!isOwner && !isAuthor)
             throw new ForbiddenException("You can only delete your own comment");
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authentication"));
+
+        // Log comment deletion activity
+        activityService.log(
+                comment.getIssue().getProject(),
+                currentUser,
+                ActivityAction.DELETED,
+                ActivityEntityType.COMMENT,
+                comment.getId(),
+                comment.getIssue().getIssueName(),
+                comment.getIssue(),
+                null
+        );
 
         commentRepository.delete(comment);
 
@@ -327,31 +363,32 @@ public class CommentService {
     public List<CommentResponse> getAllCommentByProjectId(UUID projectId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
 
-        if (!projectMemberRepository.existsById(new ProjectMemberId(currentUserId, projectId)))
-            throw new ForbiddenException("Not a member of this project");
-
         return commentRepository.findByIssueProjectId(projectId)
                 .stream()
-                .map(CommentService::getCommentResponse)
+                .map(this::getCommentResponse)
                 .toList();
     }
 
     /**
      * Retrieves all root comments (replies nested recursively) for a specific issue.
      *
+     * @param projectId the unique identifier of the project (for path consistency check)
      * @param issueId the unique identifier of the issue
      * @return a list of top-level CommentResponse DTOs
      */
-    public List<CommentResponse> getAllCommentByIssueId(UUID issueId) {
+    public List<CommentResponse> getAllCommentByIssueId(UUID projectId, UUID issueId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
+        // Path consistency check: verify issue actually belongs to this project
+        issueRepository.findByIdAndProjectId(issueId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this project"));
         return commentRepository.findByIssueIdAndParentCommentIsNull(issueId)
                 .stream()
-                .map(CommentService::getCommentResponse)
+                .map(this::getCommentResponse)
                 .toList();
     }
 
     /// Mapper
-    private static CommentResponse getCommentResponse(Comment comment) {
+    private CommentResponse getCommentResponse(Comment comment) {
         CommentResponse response = new CommentResponse();
 
         response.setId(comment.getId());
@@ -371,7 +408,7 @@ public class CommentService {
             UserSummary user = new UserSummary();
             user.setId(comment.getUser().getId());
             user.setProfileName(comment.getUser().getProfileName());
-            user.setPicture(comment.getUser().getPicture());
+            user.setPicture(s3Service.getAvatarUrl(comment.getUser().getPicture()));
 
             response.setUser(user);
         }
@@ -380,12 +417,27 @@ public class CommentService {
         if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
             Set<CommentResponse> replies = comment.getReplies()
                     .stream()
-                    .map(CommentService::getCommentResponse)
+                    .map(this::getCommentResponse)
                     .collect(Collectors.toSet());
 
             response.setReplies(replies);
         }
 
         return response;
+    }
+
+    /**
+     * Sanitizes user-submitted HTML to prevent XSS Stored attacks.
+     * Preserves safe rich-text formatting (bold, italic, links, images)
+     * while stripping {@code <script>} tags and event handler attributes.
+     *
+     * @param html raw HTML input (may be null)
+     * @return sanitized HTML, or null if input was null
+     */
+    private String sanitizeHtml(String html) {
+        if (html == null) {
+            return null;
+        }
+        return Jsoup.clean(html, Safelist.basicWithImages());
     }
 }

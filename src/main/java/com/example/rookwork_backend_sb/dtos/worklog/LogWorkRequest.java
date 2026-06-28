@@ -9,5 +9,6 @@ public class LogWorkRequest {
     public UUID issueId;
     public Instant startAt;
     public Instant endAt;
+    public String timezone;
     public String note;
 }

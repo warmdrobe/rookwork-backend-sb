@@ -5,6 +5,7 @@ import com.example.rookwork_backend_sb.entities.*;
 import com.example.rookwork_backend_sb.repositories.ActivityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,6 +22,8 @@ import java.util.UUID;
 @Service
 public class ActivityService {
     private final ActivityRepository activityRepository;
+    private final SimpMessagingTemplate simpMessagingTemplate;
+    private final S3Service s3Service;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -38,6 +41,13 @@ public class ActivityService {
                 ActivityAction action, ActivityEntityType entityType,
                 UUID entityId, String entityName,
                 Map<String, Object> metadata){
+        log(project, actor, action, entityType, entityId, entityName, null, metadata);
+    }
+
+    public void log (Project project, User actor,
+                ActivityAction action, ActivityEntityType entityType,
+                UUID entityId, String entityName, Issue issue,
+                Map<String, Object> metadata){
         String metadataJson = null;
         if (metadata != null) {
             try {
@@ -53,10 +63,29 @@ public class ActivityService {
                 .entityType(entityType)
                 .entityId(entityId)
                 .entityName(entityName)
+                .issue(issue)
                 .metadata(metadataJson)
                 .createdAt(Instant.now())
                 .build();
         activityRepository.save(activity);
+
+        // Broadcast real-time activity update
+        try {
+            ActivityResponse response = toResponse(activity);
+            if (issue != null) {
+                simpMessagingTemplate.convertAndSend(
+                        "/topic/project/" + project.getId() + "/issue/" + issue.getId() + "/activities",
+                        (Object) Map.of("type", "NEW_ACTIVITY", "activity", response)
+                );
+            }
+            simpMessagingTemplate.convertAndSend(
+                    "/topic/project/" + project.getId() + "/activities",
+                    (Object) Map.of("type", "NEW_ACTIVITY", "activity", response)
+            );
+        } catch (Exception e) {
+            // Log warning but don't fail transaction for WebSocket issues
+            System.err.println("Failed to broadcast activity update: " + e.getMessage());
+        }
     }
 
     /**
@@ -186,7 +215,7 @@ public class ActivityService {
         return ActivityResponse.builder()
                 .id(a.getId())
                 .actorName(a.getActor().getProfileName())
-                .actorPicture(a.getActor().getPicture())
+                .actorPicture(s3Service.getAvatarUrl(a.getActor().getPicture()))
                 .actionType(a.getActionType().name())
                 .entityType(a.getEntityType().name())
                 .entityId(a.getEntityId())

@@ -23,18 +23,20 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SecurityUtil securityUtil;
+    private final S3Service s3Service;
 
     /**
      * Retrieves all notifications for the current authenticated user.
      *
      * @return a list of NotificationResponse DTOs
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<NotificationResponse> getAll() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
                 .findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream()
-                .map(NotificationService::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -43,12 +45,13 @@ public class NotificationService {
      *
      * @return a list of unread NotificationResponse DTOs
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<NotificationResponse> getUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository
                 .findByUserIdAndIsReadFalseOrderByCreatedAtDesc(currentUserId)
                 .stream()
-                .map(NotificationService::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -57,6 +60,7 @@ public class NotificationService {
      *
      * @return the count of unread notifications
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public long countUnread() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         return notificationRepository.countByUserIdAndIsReadFalse(currentUserId);
@@ -69,6 +73,7 @@ public class NotificationService {
      * @throws ResourceNotFoundException if the notification does not exist
      * @throws ForbiddenException if the notification does not belong to the current user
      */
+    @org.springframework.transaction.annotation.Transactional
     public void markAsRead(UUID notificationId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         Notification notification = notificationRepository.findById(notificationId)
@@ -86,6 +91,7 @@ public class NotificationService {
     /**
      * Marks all unread notifications for the current user as read.
      */
+    @org.springframework.transaction.annotation.Transactional
     public void markAllAsRead() {
         UUID currentUserId = securityUtil.getCurrentUserId();
         List<Notification> unread = notificationRepository
@@ -105,6 +111,7 @@ public class NotificationService {
      * @throws ResourceNotFoundException if the notification is not found
      * @throws ForbiddenException if the notification does not belong to the current user
      */
+    @org.springframework.transaction.annotation.Transactional
     public void delete(UUID notificationId) {
         UUID currentUserId = securityUtil.getCurrentUserId();
         Notification notification = notificationRepository.findById(notificationId)
@@ -117,19 +124,21 @@ public class NotificationService {
         notificationRepository.delete(notification);
     }
 
-    private static NotificationResponse toResponse(Notification n) {
+    private NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId())
                 .title(n.getTitle())
                 .sender(n.getSender() != null ? UserSummary.builder()
                         .id(n.getSender().getId())
                         .profileName(n.getSender().getProfileName())
-                        .picture(n.getSender().getPicture())
+                        .picture(s3Service.getAvatarUrl(n.getSender().getPicture()))
                         .build() : null)
                 .message(n.getMessage())
                 .issueId(n.getIssue() != null ? n.getIssue().getId() : null)
                 .issueName(n.getIssue() != null ? n.getIssue().getIssueName() : null)
                 .invitationId(n.getInvitation() != null ? n.getInvitation().getId() : null)
+                .invitationStatus(n.getInvitation() != null ? n.getInvitation().getStatus().name() : null)
+                .projectId(n.getInvitation() != null ? n.getInvitation().getProject().getId() : (n.getIssue() != null ? n.getIssue().getProject().getId() : null))
                 .isRead(n.isRead())
                 .createdAt(n.getCreatedAt())
                 .build();

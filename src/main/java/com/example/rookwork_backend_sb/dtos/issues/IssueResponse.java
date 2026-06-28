@@ -4,12 +4,14 @@ import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
 import com.example.rookwork_backend_sb.entities.Status;
+import com.example.rookwork_backend_sb.dtos.subtasks.SubTaskResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -25,8 +27,10 @@ public class IssueResponse {
     public Status status;
     public UUID parentId;
     public UUID projectId;
-    public UserSummary assignedTo;
+    public List<UserSummary> assignees;
     public Instant deadline;
     public Instant createdAt;
     public Instant updatedAt;
+    public List<AttachmentResponse> attachments;
+    public List<SubTaskResponse> subtasks;
 }
