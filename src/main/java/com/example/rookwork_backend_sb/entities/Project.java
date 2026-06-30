@@ -46,5 +46,11 @@ public class Project {
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Event> events = new HashSet<>();
 
+    /** Ordered workflow columns for this project's Kanban board. */
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @Builder.Default
+    private List<ProjectStatus> statuses = new ArrayList<>();
+
 
 }

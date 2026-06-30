@@ -40,6 +40,9 @@ public class IssueService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
     private final S3Service s3Service;
+    private final ProjectStatusRepository projectStatusRepository;
+    private final ProjectStatusService projectStatusService;
+    private final WorkflowService workflowService;
     private final IssueTypeRepository issueTypeRepository;
 
     /**
@@ -62,6 +65,17 @@ public class IssueService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
+        // Resolve the status column — must belong to this project
+        ProjectStatus status = null;
+        if (request.getStatusId() != null) {
+            status = projectStatusRepository.findByIdAndProjectId(request.getStatusId(), projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Status not found in this project"));
+        } else {
+            // Default to first column (TO_DO) if caller doesn't specify
+            status = projectStatusRepository.findAllByProjectIdOrderByPositionAsc(projectId)
+                    .stream().findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("No statuses configured for this project"));
+        }
         if (request.getIssueTypeId() == null) {
             throw new BadRequestException("Issue type ID is required");
         }
@@ -73,7 +87,7 @@ public class IssueService {
                 .description(sanitizeHtml(request.getDescription()))
                 .issueType(issueType)
                 .priority(request.getPriority())
-                .status(request.getStatus())
+                .status(status)
                 .deadline(request.getDeadline())
                 .project(project)
                 .createdBy(currentUser)
@@ -123,7 +137,7 @@ public class IssueService {
                 .findByIdAndProjectId(issueId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
-        Status oldStatus = issue.getStatus();
+        ProjectStatus oldStatus = issue.getStatus();
         List<UUID> oldAssigneeIds = issue.getAssignees().stream()
                 .map(User::getId)
                 .collect(Collectors.toList());
@@ -217,9 +231,14 @@ public class IssueService {
             }
         }
 
-        if (request.getStatus() != null) {
-            Status newStatus = request.getStatus();
-            if (newStatus != oldStatus) {
+        if (request.getStatusId() != null) {
+            ProjectStatus newStatus = projectStatusRepository
+                    .findByIdAndProjectId(request.getStatusId(), projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Status not found in this project"));
+            if (!newStatus.getId().equals(oldStatus != null ? oldStatus.getId() : null)) {
+                if (oldStatus != null) {
+                    workflowService.validateTransition(projectId, oldStatus.getId(), newStatus.getId());
+                }
                 issue.setStatus(newStatus);
                 statusChanged = true;
             }
@@ -302,7 +321,7 @@ public class IssueService {
 
         // Log status change activity
         if (statusChanged) {
-            if (issue.getStatus() == Status.DONE) {
+            if (issue.getStatus() != null && issue.getStatus().getStatusCategory() == StatusCategory.DONE) {
                 activityService.log(
                         project, currentUser,
                         ActivityAction.COMPLETED,
@@ -319,7 +338,10 @@ public class IssueService {
                         ActivityEntityType.ISSUE,
                         issue.getId(),
                         issue.getIssueName(),
-                        Map.of("from", oldStatus.name(), "to", issue.getStatus().name())
+                        Map.of(
+                            "from", oldStatus != null ? oldStatus.getStatusName() : "none",
+                            "to",   issue.getStatus() != null ? issue.getStatus().getStatusName() : "none"
+                        )
                 );
             }
         }
@@ -478,7 +500,7 @@ public class IssueService {
                     .build());
         }
         response.setPriority(issue.getPriority());
-        response.setStatus(issue.getStatus());
+        response.setStatus(issue.getStatus() != null ? projectStatusService.toResponse(issue.getStatus()) : null);
         response.setParentId(issue.getParent() != null ? issue.getParent().getId() : null);
         response.setProjectId(projectId);
         response.setDeadline(issue.getDeadline());
