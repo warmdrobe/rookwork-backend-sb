@@ -2,10 +2,10 @@ package com.example.rookwork_backend_sb.dtos.issues;
 
 import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
-import com.example.rookwork_backend_sb.entities.Status;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Data
 public class CreateIssueRequest {
@@ -14,5 +14,6 @@ public class CreateIssueRequest {
     public PriorityType priority;
     public String description;
     public Instant deadline;
-    public Status status;
+    /** UUID of the ProjectStatus column this issue starts in. */
+    public UUID statusId;
 }

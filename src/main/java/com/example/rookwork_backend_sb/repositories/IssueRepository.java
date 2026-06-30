@@ -1,12 +1,12 @@
 package com.example.rookwork_backend_sb.repositories;
 
 import com.example.rookwork_backend_sb.entities.Issue;
+import com.example.rookwork_backend_sb.entities.StatusCategory;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.example.rookwork_backend_sb.entities.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,7 +23,9 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
 
     //process
     long countByProjectId(UUID projectId);
-    long countByProjectIdAndStatus(UUID projectId, Status status);
+
+    @Query("SELECT COUNT(i) FROM Issue i WHERE i.project.id = :projectId AND i.status.statusCategory = :category")
+    long countByProjectIdAndStatusCategory(@Param("projectId") UUID projectId, @Param("category") StatusCategory category);
 
     @Query("SELECT MAX(i.deadline) FROM Issue i WHERE i.project.id = :projectId")
     java.time.Instant findMaxDeadlineByProjectId(@Param("projectId") UUID projectId);

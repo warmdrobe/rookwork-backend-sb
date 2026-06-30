@@ -2,7 +2,6 @@ package com.example.rookwork_backend_sb.dtos.issues;
 
 import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
-import com.example.rookwork_backend_sb.entities.Status;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -20,6 +19,7 @@ public class UpdateIssueRequest {
     public LocalDate deadline;
     /** null = không thay đổi, [] = xóa hết assignee, [id1,id2] = set mới */
     public List<UUID> assigneeIds;
-    public Status status;
+    /** null = no change. UUID of the target ProjectStatus column. */
+    public UUID statusId;
     public UUID parentId;
 }
