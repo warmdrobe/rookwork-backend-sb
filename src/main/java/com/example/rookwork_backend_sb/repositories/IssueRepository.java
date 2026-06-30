@@ -17,6 +17,7 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
     Optional<Issue> findById(UUID id);
     List<Issue> findAllByProjectId(UUID projectId);
     Optional<Issue> findByIdAndProjectId(UUID id, UUID projectId);
+    long countByIssueTypeId(UUID issueTypeId);
 
     @Query("SELECT i FROM Issue i JOIN i.assignees u WHERE u.id = :userId")
     List<Issue> findAllByAssigneeId(@Param("userId") UUID userId);
