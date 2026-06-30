@@ -35,6 +35,7 @@ public class ProjectService {
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
     private final S3Service s3Service;
+    private final ProjectStatusService projectStatusService;
     private final IssueTypeRepository issueTypeRepository;
 
     /**
@@ -79,6 +80,9 @@ public class ProjectService {
                 .updatedAt(Instant.now())
                 .build();
         projectMemberRepository.save(projectMember);
+
+        // Seed 3 default status columns for the new project
+        projectStatusService.seedDefaultStatuses(project);
 
         ProjectResponse response = new ProjectResponse();
         response.setId(project.getId());
@@ -189,7 +193,7 @@ public class ProjectService {
 
                     // Count total and resolved issues within the project
                     long total = issueRepository.countByProjectId(member.getProject().getId());
-                    long done = issueRepository.countByProjectIdAndStatus(member.getProject().getId(), Status.DONE);
+                    long done = issueRepository.countByProjectIdAndStatusCategory(member.getProject().getId(), StatusCategory.DONE);
                     Instant deadline = issueRepository.findMaxDeadlineByProjectId(member.getProject().getId());
 
                     String ownerName = members.stream()

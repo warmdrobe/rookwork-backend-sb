@@ -35,9 +35,9 @@ public class Issue {
     @Enumerated(EnumType.STRING)
     private PriorityType priority;
 
-    @Column(name="status")
-    @Enumerated(EnumType.STRING)
-    private Status status;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_id", nullable = false)
+    private ProjectStatus status;
     // Self reference (parent issue)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
