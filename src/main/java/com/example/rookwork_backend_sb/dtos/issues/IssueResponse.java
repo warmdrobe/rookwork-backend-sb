@@ -1,7 +1,6 @@
 package com.example.rookwork_backend_sb.dtos.issues;
 
 import com.example.rookwork_backend_sb.dtos.UserSummary;
-import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
 import com.example.rookwork_backend_sb.entities.Status;
 import com.example.rookwork_backend_sb.dtos.subtasks.SubTaskResponse;
@@ -22,7 +21,7 @@ public class IssueResponse {
     public UUID id;
     public String issueName;
     public String description;
-    public IssueType issueType;
+    public IssueTypeResponse issueType;
     public PriorityType priority;
     public Status status;
     public UUID parentId;
