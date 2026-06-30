@@ -22,7 +22,7 @@ public class IssueResponse {
     public UUID id;
     public String issueName;
     public String description;
-    public IssueType issueType;
+    public IssueTypeResponse issueType;
     public PriorityType priority;
     public ProjectStatusResponse status;
     public UUID parentId;

@@ -43,6 +43,7 @@ public class IssueService {
     private final ProjectStatusRepository projectStatusRepository;
     private final ProjectStatusService projectStatusService;
     private final WorkflowService workflowService;
+    private final IssueTypeRepository issueTypeRepository;
 
     /**
      * Creates a new issue in a project and logs the creation activity.
@@ -75,11 +76,16 @@ public class IssueService {
                     .stream().findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException("No statuses configured for this project"));
         }
+        if (request.getIssueTypeId() == null) {
+            throw new BadRequestException("Issue type ID is required");
+        }
+        IssueType issueType = issueTypeRepository.findByIdAndProjectId(request.getIssueTypeId(), projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue type not found"));
 
         Issue issue = Issue.builder()
                 .issueName(request.getIssueName())
                 .description(sanitizeHtml(request.getDescription()))
-                .issueType(request.getIssueType())
+                .issueType(issueType)
                 .priority(request.getPriority())
                 .status(status)
                 .deadline(request.getDeadline())
@@ -156,8 +162,10 @@ public class IssueService {
             }
         }
 
-        if (request.getIssueType() != null) {
-            issue.setIssueType(request.getIssueType());
+        if (request.getIssueTypeId() != null) {
+            IssueType issueType = issueTypeRepository.findByIdAndProjectId(request.getIssueTypeId(), projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Issue type not found"));
+            issue.setIssueType(issueType);
         }
 
         if (request.getDescription() != null) {
@@ -481,7 +489,16 @@ public class IssueService {
         response.setId(issue.getId());
         response.setIssueName(issue.getIssueName());
         response.setDescription(issue.getDescription());
-        response.setIssueType(issue.getIssueType());
+        if (issue.getIssueType() != null) {
+            response.setIssueType(IssueTypeResponse.builder()
+                    .id(issue.getIssueType().getId())
+                    .name(issue.getIssueType().getName())
+                    .description(issue.getIssueType().getDescription())
+                    .iconKey(issue.getIssueType().getIconKey())
+                    .color(issue.getIssueType().getColor())
+                    .isSystem(issue.getIssueType().isSystem())
+                    .build());
+        }
         response.setPriority(issue.getPriority());
         response.setStatus(issue.getStatus() != null ? projectStatusService.toResponse(issue.getStatus()) : null);
         response.setParentId(issue.getParent() != null ? issue.getParent().getId() : null);

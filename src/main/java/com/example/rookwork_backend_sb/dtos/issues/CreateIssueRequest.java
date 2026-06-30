@@ -1,6 +1,6 @@
 package com.example.rookwork_backend_sb.dtos.issues;
 
-import com.example.rookwork_backend_sb.entities.IssueType;
+import java.util.UUID;
 import com.example.rookwork_backend_sb.entities.PriorityType;
 import lombok.Data;
 
@@ -10,7 +10,7 @@ import java.util.UUID;
 @Data
 public class CreateIssueRequest {
     public String issueName;
-    public IssueType issueType;
+    public UUID issueTypeId;
     public PriorityType priority;
     public String description;
     public Instant deadline;

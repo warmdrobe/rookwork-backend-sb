@@ -1,6 +1,5 @@
 package com.example.rookwork_backend_sb.dtos.issues;
 
-import com.example.rookwork_backend_sb.entities.IssueType;
 import com.example.rookwork_backend_sb.entities.PriorityType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,7 +13,7 @@ import java.util.UUID;
 public class UpdateIssueRequest {
     public String issueName;
     public String description;
-    public IssueType issueType;
+    public UUID issueTypeId;
     public PriorityType priority;
     public LocalDate deadline;
     /** null = không thay đổi, [] = xóa hết assignee, [id1,id2] = set mới */
