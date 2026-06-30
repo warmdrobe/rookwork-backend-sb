@@ -9,6 +9,7 @@ import com.example.rookwork_backend_sb.exceptions.AppException;
 import com.example.rookwork_backend_sb.exceptions.ConflictException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.repositories.SystemSettingRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final SystemSettingRepository systemSettingRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${google.client-id:#{null}}")
@@ -72,6 +74,13 @@ public class AuthService {
         // Fetch user from repository and generate authentication tokens
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Your account has been suspended by the Administrator.");
+        }
+        
+        checkMaintenanceMode(user);
+        
         return generateTokens(user);
     }
 
@@ -210,6 +219,13 @@ public class AuthService {
         if (isNewUser) {
             emailService.sendWelcomeEmail(user.getEmail(), user.getProfileName());
         }
+        
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Your account has been suspended by the Administrator.");
+        }
+        
+        checkMaintenanceMode(user);
+        
         return generateTokens(user);
     }
 
@@ -244,6 +260,18 @@ public class AuthService {
                 throw (UnauthorizedException) e;
             }
             throw new UnauthorizedException("Failed to verify Google token: " + e.getMessage());
+        }
+    }
+
+    private void checkMaintenanceMode(User user) {
+        if (user.isAdmin()) {
+            return;
+        }
+        boolean isMaintenance = systemSettingRepository.findById("maintenance_mode")
+                .map(setting -> "true".equalsIgnoreCase(setting.getSettingValue()))
+                .orElse(false);
+        if (isMaintenance) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "The system is currently under maintenance. Please try again later.");
         }
     }
 }

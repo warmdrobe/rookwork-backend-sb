@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Query;
 
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
@@ -14,4 +15,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     List<Comment> findByIssueId(UUID issueId);
     List<Comment> findByIssueProjectId(UUID projectId);
     List<Comment> findByIssueIdAndParentCommentIsNull(UUID issueId);
+
+    @Query("SELECT c.issue.project.id, COUNT(c) FROM Comment c WHERE c.issue.project IS NOT NULL GROUP BY c.issue.project.id")
+    List<Object[]> getCommentCountByProject();
 }

@@ -24,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.rookwork_backend_sb.services.S3Service;
 import java.io.IOException;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -48,8 +49,15 @@ public class UserController {
   public ResponseEntity<UserSummary> getCurrentUser() {
     UUID userId = securityUtil.getCurrentUserId();
     User user = userRepository.findById(userId)
-
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    // Update lastActiveAt to track DAU/MAU. Throttle DB writes to once per hour.
+    Instant now = Instant.now();
+    if (user.getLastActiveAt() == null || user.getLastActiveAt().isBefore(now.minusSeconds(3600))) {
+        user.setLastActiveAt(now);
+        userRepository.save(user);
+    }
+
     return ResponseEntity.ok(UserSummary.builder()
         .id(user.getId())
         .profileName(user.getProfileName())

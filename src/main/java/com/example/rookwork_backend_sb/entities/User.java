@@ -60,6 +60,9 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "last_active_at")
+    private Instant lastActiveAt;
+
     @Column(name = "job_title")
     private String jobTitle;
 

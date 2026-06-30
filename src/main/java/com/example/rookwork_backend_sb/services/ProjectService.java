@@ -12,6 +12,7 @@ import com.example.rookwork_backend_sb.repositories.IssueRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.repositories.SystemSettingRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ProjectService {
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
     private final S3Service s3Service;
+    private final SystemSettingRepository systemSettingRepository;
 
     /**
      * Creates a new project and sets the creator as the project owner.
@@ -50,6 +52,20 @@ public class ProjectService {
 
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(()->new ResourceNotFoundException("User not found"));
+
+        // Enforce max_projects_per_user quota
+        int maxProjects = systemSettingRepository.findById("max_projects_per_user")
+                .map(s -> Integer.parseInt(s.getSettingValue()))
+                .orElse(5); // Default to 5 if not set
+        
+        long ownedProjects = projectMemberRepository.findAllByUser_Id(currentUserId).stream()
+                .filter(pm -> pm.getRole() == ProjectRole.OWNER)
+                .count();
+
+        if (ownedProjects >= maxProjects) {
+            throw new ForbiddenException("You have reached the maximum number of workspaces allowed (" + maxProjects + ").");
+        }
+
         Project project = Project.builder()
                 .projectName(request.projectName)
                 .description(request.description)

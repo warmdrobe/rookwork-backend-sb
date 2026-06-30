@@ -7,6 +7,7 @@ import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.dtos.auth.RefreshRequest;
 import com.example.rookwork_backend_sb.services.AuthService;
 import com.example.rookwork_backend_sb.services.RateLimitingService;
+import com.example.rookwork_backend_sb.repositories.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class AuthController {
 
   private final AuthService authService;
   private final RateLimitingService rateLimiter;
+  private final SystemSettingRepository systemSettingRepository;
 
   /**
    * Authenticates user credentials and issues tokens.
@@ -95,5 +97,28 @@ public class AuthController {
   @org.springframework.web.bind.annotation.GetMapping("/check-email")
   public ResponseEntity<Boolean> checkEmail(@org.springframework.web.bind.annotation.RequestParam String email) {
     return ResponseEntity.ok(authService.checkEmailExists(email));
+  }
+
+  /**
+   * Retrieves the current active system broadcast message, if any.
+   *
+   * @return a map containing the broadcast status and message
+   */
+  @org.springframework.web.bind.annotation.GetMapping("/system-broadcast")
+  public ResponseEntity<java.util.Map<String, Object>> getSystemBroadcast() {
+    java.util.Map<String, Object> response = new java.util.HashMap<>();
+    
+    boolean isActive = systemSettingRepository.findById("system_broadcast_active")
+            .map(s -> "true".equalsIgnoreCase(s.getSettingValue()))
+            .orElse(false);
+            
+    String message = systemSettingRepository.findById("system_broadcast_message")
+            .map(com.example.rookwork_backend_sb.entities.SystemSetting::getSettingValue)
+            .orElse("");
+            
+    response.put("active", isActive);
+    response.put("message", message);
+    
+    return ResponseEntity.ok(response);
   }
 }
