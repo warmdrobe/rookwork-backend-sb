@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.security.CustomUserDetailsService;
 import com.example.rookwork_backend_sb.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.Customizer;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -36,8 +37,7 @@ public class SecurityConfig {
       throws Exception {
 
     http
-        .cors(cors -> {
-        })
+        .cors(Customizer.withDefaults())
         .csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
@@ -69,7 +69,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public PasswordEncoder passwordEncoder() {
+public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
   }
 
@@ -96,3 +96,4 @@ public class SecurityConfig {
     return source;
   }
 }
+
