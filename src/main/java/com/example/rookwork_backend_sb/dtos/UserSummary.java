@@ -30,4 +30,5 @@ public class UserSummary {
     public boolean notifyDailyDigest;
     public String role;
     public boolean hasPassword;
+    public boolean isAdmin;
 }

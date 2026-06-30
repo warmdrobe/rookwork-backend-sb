@@ -119,4 +119,8 @@ public class User {
     private String setupPasswordOtp;
     @Column(name = "setup_password_otp_expires_at")
     private Instant setupPasswordOtpExpiresAt;
+
+    @Column(name = "is_admin", nullable = false)
+    @Builder.Default
+    private boolean isAdmin = false;
 }

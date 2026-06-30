@@ -67,6 +67,7 @@ public class UserController {
         .notifyProjectUpdates(user.isNotifyProjectUpdates())
         .notifyDailyDigest(user.isNotifyDailyDigest())
         .hasPassword(user.getPasswordHash() != null)
+        .isAdmin(user.isAdmin())
         .build());
   }
 
