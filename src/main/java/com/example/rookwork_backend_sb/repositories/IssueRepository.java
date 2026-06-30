@@ -27,4 +27,9 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
 
     @Query("SELECT MAX(i.deadline) FROM Issue i WHERE i.project.id = :projectId")
     java.time.Instant findMaxDeadlineByProjectId(@Param("projectId") UUID projectId);
+
+    @Query("SELECT i FROM Issue i JOIN i.project p JOIN p.projectMembers pm WHERE pm.user.id = :userId AND " +
+           "(LOWER(i.issueName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(i.description) LIKE LOWER(CONCAT('%', :query, '%')))")
+    List<Issue> searchIssuesForUser(@Param("userId") UUID userId, @Param("query") String query);
 }
