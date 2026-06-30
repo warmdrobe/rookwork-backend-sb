@@ -12,6 +12,7 @@ import com.example.rookwork_backend_sb.repositories.IssueRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.repositories.IssueTypeRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ProjectService {
     private final SecurityUtil securityUtil;
     private final IssueRepository issueRepository;
     private final S3Service s3Service;
+    private final IssueTypeRepository issueTypeRepository;
 
     /**
      * Creates a new project and sets the creator as the project owner.
@@ -58,6 +60,14 @@ public class ProjectService {
                 .updatedAt(Instant.now())
                 .build();
         projectRepository.save(project);
+
+        // Seed system issue types
+        List<IssueType> systemTypes = List.of(
+            IssueType.builder().project(project).name("TASK").description("A single piece of work").iconKey("task").color("#1D4ED8").isSystem(true).build(),
+            IssueType.builder().project(project).name("STORY").description("A user-facing feature").iconKey("story").color("#15803D").isSystem(true).build(),
+            IssueType.builder().project(project).name("EPIC").description("A large body of work").iconKey("epic").color("#7E22CE").isSystem(true).build()
+        );
+        issueTypeRepository.saveAll(systemTypes);
 
         // Automatically assign the creator as the OWNER member of the new project
         ProjectMember projectMember = ProjectMember.builder()

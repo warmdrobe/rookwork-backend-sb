@@ -27,9 +27,9 @@ public class Issue {
     @Column(columnDefinition = "text")
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "issue_type", length = 20, nullable = false)
-    private IssueType issueType; // EPIC, STORY, TASK
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_type_id", nullable = false)
+    private IssueType issueType;
 
     @Column(name="priority")
     @Enumerated(EnumType.STRING)
