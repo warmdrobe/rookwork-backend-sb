@@ -38,6 +38,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .username(user.getId().toString())
                 .password(user.getPasswordHash() != null ? user.getPasswordHash() : "NO_PASSWORD_SET")
                 .roles("USER")
+                .disabled(!user.isActive())
                 .build();
     }
 }

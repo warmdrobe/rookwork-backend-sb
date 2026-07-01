@@ -2,6 +2,7 @@ package com.example.rookwork_backend_sb.controllers;
 
 import com.example.rookwork_backend_sb.dtos.events.CreateEventRequest;
 import com.example.rookwork_backend_sb.dtos.events.EventResponse;
+import com.example.rookwork_backend_sb.dtos.events.UpdateEventRequest;
 import com.example.rookwork_backend_sb.services.EventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,11 @@ public class EventController {
     @PreAuthorize("#request.projectId == null or @projectSecurity.isMember(#request.projectId)")
     public ResponseEntity<EventResponse> createEvent(@RequestBody CreateEventRequest request) {
         return ResponseEntity.ok(eventService.createEvent(request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EventResponse> updateEvent(@PathVariable UUID id, @RequestBody UpdateEventRequest request) {
+        return ResponseEntity.ok(eventService.updateEvent(id, request));
     }
 
     @DeleteMapping("/{id}")

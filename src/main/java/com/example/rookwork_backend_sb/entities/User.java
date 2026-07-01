@@ -93,6 +93,20 @@ public class User {
     @Builder.Default
     private boolean notifyDailyDigest = false;
 
+    @Column(name="notify_comment")
+    @Builder.Default
+    private boolean notifyComment = true;
+
+    @Column(name="notify_event_invited")
+    @Builder.Default
+    private boolean notifyEventInvited = true;
+
+    @Column(name = "otp_code", length = 6)
+    private String otpCode;
+
+    @Column(name = "otp_expiry")
+    private java.time.Instant otpExpiry;
+
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();
 
