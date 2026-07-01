@@ -66,6 +66,8 @@ public class UserController {
         .notifyMentioned(user.isNotifyMentioned())
         .notifyProjectUpdates(user.isNotifyProjectUpdates())
         .notifyDailyDigest(user.isNotifyDailyDigest())
+        .notifyComment(user.isNotifyComment())
+        .notifyEventInvited(user.isNotifyEventInvited())
         .build());
   }
 
