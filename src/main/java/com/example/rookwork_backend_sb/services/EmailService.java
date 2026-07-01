@@ -26,6 +26,15 @@ public class EmailService {
     @Value("${app.email.from:no-reply@rookwork.asia}")
     private String fromEmail;
 
+    private void renderAndSend(String toEmail, String subject, String templateName, Context ctx) {
+        try {
+            String html = templateEngine.process(templateName, ctx);
+            send(toEmail, subject, html);
+        } catch (Exception e) {
+            log.error("Failed to process/send email with template {} to {}: {}", templateName, toEmail, e.getMessage(), e);
+        }
+    }
+
     @Async("emailExecutor")
     public void sendIssueAssignment(String toEmail, String issueName, String projectName,
                                      String assignedByName, String issueUrl) {
@@ -34,13 +43,7 @@ public class EmailService {
         ctx.setVariable("projectName", projectName);
         ctx.setVariable("assignedByName", assignedByName);
         ctx.setVariable("issueUrl", issueUrl);
-
-        try {
-            String html = templateEngine.process("email/issue-assignment", ctx);
-            send(toEmail, "New task assigned: " + issueName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send issue assignment email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, "New task assigned: " + issueName, "email/issue-assignment", ctx);
     }
 
     @Async("emailExecutor")
@@ -59,12 +62,7 @@ public class EmailService {
             ? "New reply on task: " + issueName 
             : "New comment on task: " + issueName;
 
-        try {
-            String html = templateEngine.process("email/comment-notification", ctx);
-            send(toEmail, subject, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send comment notification email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, subject, "email/comment-notification", ctx);
     }
 
     @Async("emailExecutor")
@@ -80,12 +78,7 @@ public class EmailService {
         ctx.setVariable("projectName", projectName);
         ctx.setVariable("calendarUrl", calendarUrl);
 
-        try {
-            String html = templateEngine.process("email/event-invitation", ctx);
-            send(toEmail, "Event Invitation: " + eventName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send event invitation email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, "Event Invitation: " + eventName, "email/event-invitation", ctx);
     }
 
     @Async("emailExecutor")
@@ -100,12 +93,7 @@ public class EmailService {
         ctx.setVariable("changeSummary", changeSummary);
         ctx.setVariable("calendarUrl", calendarUrl);
 
-        try {
-            String html = templateEngine.process("email/event-updated", ctx);
-            send(toEmail, "Event Updated: " + eventName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send event updated email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, "Event Updated: " + eventName, "email/event-updated", ctx);
     }
 
     @Async("emailExecutor")
@@ -116,12 +104,7 @@ public class EmailService {
         ctx.setVariable("eventTime", eventTime);
         ctx.setVariable("cancelledByName", cancelledByName);
 
-        try {
-            String html = templateEngine.process("email/event-cancelled", ctx);
-            send(toEmail, "Event Cancelled: " + eventName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send event cancelled email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, "Event Cancelled: " + eventName, "email/event-cancelled", ctx);
     }
 
     @Async("emailExecutor")
@@ -134,12 +117,7 @@ public class EmailService {
         ctx.setVariable("isNewUser", isNewUser);
         ctx.setVariable("footerNote", "This is an important email regarding your project invitation on Rookwork. You cannot unsubscribe from this type of email.");
 
-        try {
-            String html = templateEngine.process("email/project-invitation", ctx);
-            send(toEmail, invitedByName + " invited you to project: " + projectName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send project invitation email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, invitedByName + " invited you to project: " + projectName, "email/project-invitation", ctx);
     }
 
     @Async("emailExecutor")
@@ -152,13 +130,7 @@ public class EmailService {
         ctx.setVariable("projectUrl", projectUrl);
 
         String statusStr = accepted ? "accepted" : "declined";
-
-        try {
-            String html = templateEngine.process("email/project-invitation-response", ctx);
-            send(toEmail, respondedByName + " has " + statusStr + " the invitation to project " + projectName, html);
-        } catch (Exception e) {
-            log.error("Failed to process/send project invitation response email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, respondedByName + " has " + statusStr + " the invitation to project " + projectName, "email/project-invitation-response", ctx);
     }
 
     @Async("emailExecutor")
@@ -167,13 +139,7 @@ public class EmailService {
         ctx.setVariable("otpCode", otpCode);
 
         log.info("[OTP REGISTRATION] Sending OTP {} to email {}", otpCode, toEmail);
-
-        try {
-            String html = templateEngine.process("email/otp-email", ctx);
-            send(toEmail, "Rookwork Account Verification Code", html);
-        } catch (Exception e) {
-            log.error("Failed to process/send OTP email to {}: {}", toEmail, e.getMessage(), e);
-        }
+        renderAndSend(toEmail, "Rookwork Account Verification Code", "email/otp-email", ctx);
     }
 
     private void send(String toEmail, String subject, String htmlBody) {
