@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:replace="~{email/fragments/layout :: wrapper(~{::content})}">
+  <div th:fragment="content">
+    <h2 style="margin-top: 0; color: #111827; font-size: 20px; font-weight: 600;">Project Invitation Response</h2>
+    <p style="font-size: 16px; color: #4b5563;">
+      <span th:text="${respondedByName}"></span> has
+      <strong th:text="${accepted} ? 'accepted' : 'declined'"></strong> your invitation to join the project
+      <strong th:text="${projectName}"></strong>.
+    </p>
+    <div style="text-align: center; margin: 30px 0 10px 0;">
+      <a th:href="${projectUrl}" style="background-color: #6d28d9; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 15px;">Go to Project</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

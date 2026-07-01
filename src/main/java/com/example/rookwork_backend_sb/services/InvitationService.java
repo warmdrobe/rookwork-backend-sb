@@ -27,6 +27,10 @@ import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -34,6 +38,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class InvitationService {
 
     private final InvitationRepository invitationRepository;
@@ -44,6 +49,9 @@ public class InvitationService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+
+    @Value("${app.frontend.url:https://www.rookwork.asia}")
+    private String frontendUrl;
     /**
      * Sends a project invitation to a user by email.
      *
@@ -67,7 +75,17 @@ public class InvitationService {
             throw new ForbiddenException("Only OWNER can invite members");
 
         User invitedUser = userRepository.findByEmail(invitedEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseGet(() -> {
+                    User placeholder = User.builder()
+                            .email(invitedEmail)
+                            .profileName(invitedEmail.split("@")[0])
+                            .isActive(false)
+                            .isVerified(false)
+                            .createdAt(Instant.now())
+                            .updatedAt(Instant.now())
+                            .build();
+                    return userRepository.save(placeholder);
+                });
 
         // Prevent inviting users who are already members
         if (projectMemberRepository.findById(
@@ -75,18 +93,29 @@ public class InvitationService {
             throw new ConflictException("User is already a member");
 
         // Prevent duplicate invitations to the same user
-        invitationRepository.findByProjectIdAndInvitedUserId(projectId, invitedUser.getId())
-                .ifPresent(existingInvite -> {
-                    if (existingInvite.getStatus() == InvitationStatus.PENDING) {
-                        throw new ConflictException("Invitation already sent");
-                    } else {
-                        // Delete notifications pointing to the old invitation
-                        notificationRepository.deleteByInvitationId(existingInvite.getId());
-                        // Delete the old invitation record
-                        invitationRepository.delete(existingInvite);
-                        invitationRepository.flush();
-                    }
-                });
+        java.util.Optional<Invitation> existingInviteOpt = invitationRepository.findByProjectIdAndInvitedUserId(projectId, invitedUser.getId());
+        if (existingInviteOpt.isPresent()) {
+            Invitation existingInvite = existingInviteOpt.get();
+            if (existingInvite.getStatus() == InvitationStatus.PENDING) {
+                Instant oneHourAgo = Instant.now().minus(1, java.time.temporal.ChronoUnit.HOURS);
+                if (existingInvite.getUpdatedAt() != null && existingInvite.getUpdatedAt().isAfter(oneHourAgo)) {
+                    throw new ConflictException("You can only resend the invitation after 1 hour");
+                }
+                
+                // Allow re-invite by updating updatedAt and triggering notification and email again
+                existingInvite.setUpdatedAt(Instant.now());
+                invitationRepository.save(existingInvite);
+                
+                sendInvitationNotifications(existingInvite, sender.getUser(), invitedUser, projectRepository.findById(projectId).orElseThrow(() -> new ResourceNotFoundException("Project not found")));
+                return;
+            } else {
+                // Delete notifications pointing to the old invitation
+                notificationRepository.deleteByInvitationId(existingInvite.getId());
+                // Delete the old invitation record
+                invitationRepository.delete(existingInvite);
+                invitationRepository.flush();
+            }
+        }
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
@@ -100,60 +129,42 @@ public class InvitationService {
                 .updatedAt(Instant.now())
                 .build();
         invitationRepository.save(invitation);
-        // Send a real-time and persistent notification to the invited user
-        Notification notification = Notification.builder()
-                .user(invitedUser)
-                .sender(sender.getUser())
-                .title("Project Invitation")
-                .message(sender.getUser().getProfileName()
-                        + " invited you to join \"" + project.getProjectName() + "\"")
-                .invitation(invitation)
-                .isRead(false)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-        notificationRepository.save(notification);
+        
+        sendInvitationNotifications(invitation, sender.getUser(), invitedUser, project);
+    }
 
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
+    private void sendInvitationNotifications(Invitation invitation, User sender, User invitedUser, Project project) {
+        String invitationUrl;
+        if (invitedUser.isActive()) {
+            invitationUrl = frontendUrl + "/dashboard?acceptInvitationId=" + invitation.getId();
+        } else {
+            invitationUrl = frontendUrl + "/register?invitationId=" + invitation.getId();
+        }
+
+        log.info("[PROJECT INVITATION] Generated link for testing on localhost: {}", invitationUrl);
+
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        messagingTemplate.convertAndSendToUser(
-                                invitedUser.getId().toString(),
-                                "/queue/notifications",
-                                Map.of(
-                                        "type", "INVITATION",
-                                        "notificationId", notification.getId(),
-                                        "invitationId", invitation.getId(),
-                                        "projectName", project.getProjectName(),
-                                        "invitedBy", sender.getUser().getProfileName()
-                                )
-                        );
                         emailService.sendProjectInvitation(
                                 invitedUser.getEmail(),
                                 project.getProjectName(),
-                                sender.getUser().getProfileName()
+                                sender.getProfileName(),
+                                invitationUrl,
+                                !invitedUser.isActive()
                         );
                     }
                 }
             );
         } else {
-            messagingTemplate.convertAndSendToUser(
-                    invitedUser.getId().toString(),
-                    "/queue/notifications",
-                    Map.of(
-                            "type", "INVITATION",
-                            "notificationId", notification.getId(),
-                            "invitationId", invitation.getId(),
-                            "projectName", project.getProjectName(),
-                            "invitedBy", sender.getUser().getProfileName()
-                    )
-            );
             emailService.sendProjectInvitation(
                     invitedUser.getEmail(),
                     project.getProjectName(),
-                    sender.getUser().getProfileName()
+                    sender.getProfileName(),
+                    invitationUrl,
+                    !invitedUser.isActive()
             );
         }
     }
@@ -200,53 +211,8 @@ public class InvitationService {
         invitation.setUpdatedAt(Instant.now());
         invitationRepository.save(invitation);
 
-        // Notify the inviter of the response
-        Notification notification = Notification.builder()
-                .user(invitation.getInvitedBy())
-                .sender(invitation.getInvitedUser())
-                .title(accept ? "Invitation Accepted" : "Invitation Declined")
-                .message(invitation.getInvitedUser().getProfileName()
-                        + (accept ? " accepted" : " declined")
-                        + " your invitation to \"" + invitation.getProject().getProjectName() + "\"")
-                .isRead(false)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-        notificationRepository.save(notification);
-
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        messagingTemplate.convertAndSendToUser(
-                                invitation.getInvitedBy().getId().toString(),
-                                "/queue/notifications",
-                                Map.of(
-                                        "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
-                                        "notificationId", notification.getId(),
-                                        "invitationId", invitation.getId(),
-                                        "projectId", invitation.getProject().getId(),
-                                        "projectName", invitation.getProject().getProjectName(),
-                                        "respondedBy", invitation.getInvitedUser().getProfileName()
-                                )
-                        );
-                    }
-                }
-            );
-        } else {
-            messagingTemplate.convertAndSendToUser(
-                    invitation.getInvitedBy().getId().toString(),
-                    "/queue/notifications",
-                    Map.of(
-                            "type", accept ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
-                            "notificationId", notification.getId(),
-                            "invitationId", invitation.getId(),
-                            "projectId", invitation.getProject().getId(),
-                            "projectName", invitation.getProject().getProjectName(),
-                            "respondedBy", invitation.getInvitedUser().getProfileName()
-                    )
-            );
+        if (accept) {
+            notifyProjectMembersNewMember(invitation.getInvitedUser(), invitation.getProject());
         }
     }
 
@@ -330,5 +296,56 @@ public class InvitationService {
 
         // Delete invitation
         invitationRepository.delete(invitation);
+    }
+
+    public void notifyProjectMembersNewMember(User newMember, Project project) {
+        List<ProjectMember> members = projectMemberRepository.findAllByProject_Id(project.getId());
+        for (ProjectMember existingMember : members) {
+            if (existingMember.getUser().getId().equals(newMember.getId())) continue;
+
+            Notification notification = Notification.builder()
+                    .user(existingMember.getUser())
+                    .sender(newMember)
+                    .title("New Member Joined")
+                    .message(newMember.getProfileName() + " joined the project \"" + project.getProjectName() + "\"")
+                    .isRead(false)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            notificationRepository.save(notification);
+
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            messagingTemplate.convertAndSendToUser(
+                                    existingMember.getUser().getId().toString(),
+                                    "/queue/notifications",
+                                    Map.of(
+                                            "type", "MEMBER_JOINED",
+                                            "notificationId", notification.getId(),
+                                            "projectId", project.getId(),
+                                            "projectName", project.getProjectName(),
+                                            "memberName", newMember.getProfileName()
+                                    )
+                            );
+                        }
+                    }
+                );
+            } else {
+                messagingTemplate.convertAndSendToUser(
+                        existingMember.getUser().getId().toString(),
+                        "/queue/notifications",
+                        Map.of(
+                                "type", "MEMBER_JOINED",
+                                "notificationId", notification.getId(),
+                                "projectId", project.getId(),
+                                "projectName", project.getProjectName(),
+                                "memberName", newMember.getProfileName()
+                        )
+                );
+            }
+        }
     }
 }

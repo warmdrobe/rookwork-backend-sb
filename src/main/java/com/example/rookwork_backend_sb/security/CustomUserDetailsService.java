@@ -1,13 +1,15 @@
 package com.example.rookwork_backend_sb.security;
 
-import com.example.rookwork_backend_sb.repositories.UserRepository;
-import lombok.RequiredArgsConstructor;
+import java.util.UUID;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import com.example.rookwork_backend_sb.repositories.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +43,8 @@ public class CustomUserDetailsService implements UserDetailsService {
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getId().toString())
                 .password(user.getPasswordHash() != null ? user.getPasswordHash() : "NO_PASSWORD_SET")
-                .roles(user.getSystemRole().name())
+                .roles(user.getSystemRole().name(), "USER")
+                .disabled(!user.isActive())
                 .build();
     }
 }

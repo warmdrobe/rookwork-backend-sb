@@ -120,6 +120,8 @@ public class UserService {
         user.setNotifyMentioned(request.isNotifyMentioned());
         user.setNotifyProjectUpdates(request.isNotifyProjectUpdates());
         user.setNotifyDailyDigest(request.isNotifyDailyDigest());
+        user.setNotifyComment(request.isNotifyComment());
+        user.setNotifyEventInvited(request.isNotifyEventInvited());
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
     }
