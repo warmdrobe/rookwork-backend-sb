@@ -10,6 +10,7 @@ import com.example.rookwork_backend_sb.repositories.IssueRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.ProjectStatusRepository;
+import com.example.rookwork_backend_sb.repositories.StatusTransitionRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class ProjectStatusService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository memberRepository;
     private final IssueRepository issueRepository;
+    private final StatusTransitionRepository transitionRepository;
     private final SecurityUtil securityUtil;
 
     // ──────────────────────────────────────────────────────────────────────
@@ -219,6 +221,10 @@ public class ProjectStatusService {
 
         log.info("Migrated {} issues from status '{}' to '{}' in project {}",
                 affectedIssues.size(), toDelete.getStatusName(), fallback.getStatusName(), projectId);
+
+        // 1.5. Clean up any workflow transitions referencing the deleted status
+        transitionRepository.deleteAllByFromStatusIdOrToStatusId(statusId, statusId);
+        transitionRepository.flush();
 
         // 2. Delete the status column
         int deletedPosition = toDelete.getPosition();
