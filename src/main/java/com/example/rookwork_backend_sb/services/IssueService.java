@@ -149,6 +149,7 @@ public class IssueService {
         boolean assigneesChanged = false;
         boolean statusChanged = false;
         boolean parentChanged = false;
+        boolean typeChanged = false;
 
         // Conditionally update updated fields
         if (request.getIssueName() != null) {
@@ -165,7 +166,10 @@ public class IssueService {
         if (request.getIssueTypeId() != null) {
             IssueType issueType = issueTypeRepository.findByIdAndProjectId(request.getIssueTypeId(), projectId)
                     .orElseThrow(() -> new ResourceNotFoundException("Issue type not found"));
-            issue.setIssueType(issueType);
+            if (issue.getIssueType() == null || !issue.getIssueType().getId().equals(issueType.getId())) {
+                issue.setIssueType(issueType);
+                typeChanged = true;
+            }
         }
 
         if (request.getDescription() != null) {
@@ -244,7 +248,7 @@ public class IssueService {
             }
         }
 
-        boolean isAnyFieldChanged = nameChanged || descriptionChanged || priorityChanged || deadlineChanged || assigneesChanged || statusChanged || parentChanged;
+        boolean isAnyFieldChanged = nameChanged || descriptionChanged || priorityChanged || deadlineChanged || assigneesChanged || statusChanged || parentChanged || typeChanged;
 
         if (isAnyFieldChanged) {
             issue.setUpdatedAt(Instant.now());
@@ -400,6 +404,17 @@ public class IssueService {
                     issue.getId(),
                     issue.getIssueName(),
                     Map.of("field", "parent", "to", issue.getParent() != null ? issue.getParent().getIssueName() : "None")
+            );
+        }
+
+        if (typeChanged) {
+            activityService.log(
+                    project, currentUser,
+                    ActivityAction.UPDATED,
+                    ActivityEntityType.ISSUE,
+                    issue.getId(),
+                    issue.getIssueName(),
+                    Map.of("field", "type", "to", issue.getIssueType().getName())
             );
         }
 

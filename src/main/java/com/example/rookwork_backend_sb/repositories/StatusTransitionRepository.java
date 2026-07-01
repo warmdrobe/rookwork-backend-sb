@@ -19,5 +19,7 @@ public interface StatusTransitionRepository extends JpaRepository<StatusTransiti
 
     void deleteAllByProjectId(UUID projectId);
 
+    void deleteAllByFromStatusIdOrToStatusId(UUID fromStatusId, UUID toStatusId);
+
     long countByProjectId(UUID projectId);
 }
