@@ -31,4 +31,5 @@ public class UserSummary {
     public boolean notifyComment;
     public boolean notifyEventInvited;
     public String role;
+    public String systemRole;
 }
