@@ -11,11 +11,14 @@ import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.*;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -28,7 +31,7 @@ import java.util.stream.Collectors;
 /**
  * Service class for managing project issues, subtasks, assignments, status changes, and related notifications.
  */
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
 public class IssueService {
     private final IssueRepository issueRepository;
@@ -44,6 +47,10 @@ public class IssueService {
     private final ProjectStatusService projectStatusService;
     private final WorkflowService workflowService;
     private final IssueTypeRepository issueTypeRepository;
+    private final EmailService emailService;
+
+    @Value("${app.frontend.url:https://www.rookwork.asia}")
+    private String frontendUrl;
 
     /**
      * Creates a new issue in a project and logs the creation activity.
@@ -294,7 +301,6 @@ public class IssueService {
                                 .createdAt(Instant.now())
                                 .updatedAt(Instant.now())
                                 .build();
-
                         notificationRepository.save(notification);
 
                         messagingTemplate.convertAndSendToUser(
@@ -309,6 +315,36 @@ public class IssueService {
                                         "assignedBy", currentUser.getProfileName()
                                 )
                         );
+
+                        if (assignee.isNotifyIssueAssigned()) {
+                            String issueUrl = frontendUrl + "/issues/" + issue.getId();
+                            String assigneeEmail = assignee.getEmail();
+                            String issueName = issue.getIssueName();
+                            String projectName = project.getProjectName();
+                            String assignedByName = currentUser.getProfileName();
+                            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                                    @Override
+                                    public void afterCommit() {
+                                        emailService.sendIssueAssignment(
+                                                assigneeEmail,
+                                                issueName,
+                                                projectName,
+                                                assignedByName,
+                                                issueUrl
+                                        );
+                                    }
+                                });
+                            } else {
+                                emailService.sendIssueAssignment(
+                                        assigneeEmail,
+                                        issueName,
+                                        projectName,
+                                        assignedByName,
+                                        issueUrl
+                                );
+                            }
+                        }
                     }
                 }
             } else {

@@ -43,6 +43,8 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/auth/**").permitAll()
             .requestMatchers("/ws/**").permitAll()
+            .requestMatchers("/actuator/health").permitAll()
+            .requestMatchers("/actuator/**").hasAnyRole("ADMIN", "SUPERADMIN")
             .anyRequest().authenticated())
         .authenticationProvider(authenticationProvider())
         // RateLimitFilter runs first to block brute-force before JWT processing

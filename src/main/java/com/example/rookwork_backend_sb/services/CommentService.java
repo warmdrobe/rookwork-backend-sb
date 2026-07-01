@@ -35,10 +35,13 @@ import com.example.rookwork_backend_sb.repositories.ProjectRepository;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 //import static com.example.rookwork_backend_sb.services.IssueService.getIssueResponse;
 
@@ -58,6 +61,10 @@ public class CommentService {
     private final UserRepository userRepository;
     private final ActivityService activityService;
     private final S3Service s3Service;
+    private final EmailService emailService;
+
+    @Value("${app.frontend.url:https://www.rookwork.asia}")
+    private String frontendUrl;
     /**
      * Creates a new comment under an issue, logs activity, and sends notifications.
      *
@@ -243,6 +250,75 @@ public class CommentService {
                             "replyBy", currentUser.getProfileName()
                     )
             );
+        }
+
+        // Identify email recipients and filter/deduplicate
+        List<User> newCommentRecipients = new java.util.ArrayList<>();
+        List<User> replyRecipients = new java.util.ArrayList<>();
+
+        User parentAuthor = (parent != null) ? parent.getUser() : null;
+        boolean parentAuthorValid = parentAuthor != null && 
+                                    !parentAuthor.getId().equals(currentUserId) && 
+                                    parentAuthor.isNotifyComment();
+
+        if (parentAuthorValid) {
+            replyRecipients.add(parentAuthor);
+        }
+
+        // Add creator
+        User creator = issue.getCreatedBy();
+        if (creator != null && !creator.getId().equals(currentUserId) && creator.isNotifyComment()) {
+            if (parentAuthor == null || !creator.getId().equals(parentAuthor.getId())) {
+                newCommentRecipients.add(creator);
+            }
+        }
+
+        // Add assignees
+        for (User assignee : issue.getAssignees()) {
+            if (!assignee.getId().equals(currentUserId) && assignee.isNotifyComment()) {
+                if (parentAuthor == null || !assignee.getId().equals(parentAuthor.getId())) {
+                    // Avoid duplicate if creator is also an assignee
+                    if (creator == null || !assignee.getId().equals(creator.getId())) {
+                        newCommentRecipients.add(assignee);
+                    }
+                }
+            }
+        }
+
+        // Prepare email variables
+        String issueName = issue.getIssueName();
+        String projectName = project.getProjectName();
+        String commentByName = currentUser.getProfileName();
+        String commentContent = comment.getContent();
+        String issueUrl = frontendUrl + "/issues/" + issue.getId();
+
+        // Register transactional syncs
+        for (User recipient : replyRecipients) {
+            String toEmail = recipient.getEmail();
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        emailService.sendCommentNotification(toEmail, issueName, projectName, commentByName, commentContent, issueUrl, true);
+                    }
+                });
+            } else {
+                emailService.sendCommentNotification(toEmail, issueName, projectName, commentByName, commentContent, issueUrl, true);
+            }
+        }
+
+        for (User recipient : newCommentRecipients) {
+            String toEmail = recipient.getEmail();
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        emailService.sendCommentNotification(toEmail, issueName, projectName, commentByName, commentContent, issueUrl, false);
+                    }
+                });
+            } else {
+                emailService.sendCommentNotification(toEmail, issueName, projectName, commentByName, commentContent, issueUrl, false);
+            }
         }
 
         return response;

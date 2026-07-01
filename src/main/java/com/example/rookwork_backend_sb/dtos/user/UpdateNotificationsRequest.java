@@ -14,4 +14,6 @@ public class UpdateNotificationsRequest {
     private boolean notifyMentioned;
     private boolean notifyProjectUpdates;
     private boolean notifyDailyDigest;
+    private boolean notifyComment;
+    private boolean notifyEventInvited;
 }
