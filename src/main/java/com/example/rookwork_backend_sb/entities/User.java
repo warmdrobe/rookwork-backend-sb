@@ -58,6 +58,11 @@ public class User {
     @Column(name="organization")
     private String organization;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name="system_role", nullable = false)
+    @Builder.Default
+    private SystemRole systemRole = SystemRole.USER;
+
     @Column(name="location")
     private String location;
 

@@ -34,10 +34,14 @@ public class CustomUserDetailsService implements UserDetailsService {
                             new UsernameNotFoundException("User not found"));
         }
 
+        if (!user.isActive()) {
+            throw new UsernameNotFoundException("User account is locked");
+        }
+
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getId().toString())
                 .password(user.getPasswordHash() != null ? user.getPasswordHash() : "NO_PASSWORD_SET")
-                .roles("USER")
+                .roles(user.getSystemRole().name())
                 .build();
     }
 }

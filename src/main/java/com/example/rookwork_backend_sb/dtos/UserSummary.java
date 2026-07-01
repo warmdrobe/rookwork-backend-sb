@@ -29,4 +29,5 @@ public class UserSummary {
     public boolean notifyProjectUpdates;
     public boolean notifyDailyDigest;
     public String role;
+    public String systemRole;
 }

@@ -66,6 +66,7 @@ public class UserController {
         .notifyMentioned(user.isNotifyMentioned())
         .notifyProjectUpdates(user.isNotifyProjectUpdates())
         .notifyDailyDigest(user.isNotifyDailyDigest())
+        .systemRole(user.getSystemRole().name())
         .build());
   }
 
