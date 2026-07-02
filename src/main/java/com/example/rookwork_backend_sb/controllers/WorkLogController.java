@@ -52,10 +52,11 @@ public class WorkLogController {
      */
     @GetMapping("/stats")
     public ResponseEntity<WorkStatsResponse> getStats(
-            @RequestParam(defaultValue = "weekly") String period) {
+            @RequestParam(defaultValue = "weekly") String period,
+            @RequestParam(required = false) String timezone) {
         WorkStatsResponse stats = period.equals("monthly")
-                ? workLogService.getMonthlyStats()
-                : workLogService.getWeeklyStats();
+                ? workLogService.getMonthlyStats(timezone)
+                : workLogService.getWeeklyStats(timezone);
         return ResponseEntity.ok(stats);
     }
 }
