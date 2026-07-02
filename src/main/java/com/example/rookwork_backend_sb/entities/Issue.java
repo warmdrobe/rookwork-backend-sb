@@ -65,6 +65,18 @@ public class Issue {
 
     private Instant deadline;
 
+    @Column(name = "start_date")
+    private Instant startDate = Instant.now();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "issue_dependencies",
+        joinColumns = @JoinColumn(name = "issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "depends_on_id")
+    )
+    @Builder.Default
+    private List<Issue> dependencies = new ArrayList<>();
+
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
 

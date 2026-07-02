@@ -11,4 +11,6 @@ public class UpdateStatusRequest {
 
     /** Optional hex/CSS color string, e.g. "#10b981". */
     private String color;
+
+    private com.example.rookwork_backend_sb.entities.StatusCategory statusCategory;
 }
