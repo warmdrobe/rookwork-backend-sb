@@ -112,6 +112,10 @@ public class User {
     @Column(name = "otp_expiry")
     private java.time.Instant otpExpiry;
 
+    @Column(name = "otp_failed_attempts", nullable = false)
+    @Builder.Default
+    private int otpFailedAttempts = 0;
+
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();
 
