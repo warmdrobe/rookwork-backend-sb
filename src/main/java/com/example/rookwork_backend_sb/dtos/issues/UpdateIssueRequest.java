@@ -15,9 +15,11 @@ public class UpdateIssueRequest {
     public String description;
     public UUID issueTypeId;
     public PriorityType priority;
+    public LocalDate startDate;
     public LocalDate deadline;
     /** null = không thay đổi, [] = xóa hết assignee, [id1,id2] = set mới */
     public List<UUID> assigneeIds;
+    public List<UUID> dependencyIds;
     /** null = no change. UUID of the target ProjectStatus column. */
     public UUID statusId;
     public UUID parentId;

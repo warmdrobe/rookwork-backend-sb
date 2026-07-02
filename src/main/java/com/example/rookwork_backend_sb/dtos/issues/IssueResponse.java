@@ -28,6 +28,8 @@ public class IssueResponse {
     public UUID parentId;
     public UUID projectId;
     public List<UserSummary> assignees;
+    public Instant startDate;
+    public List<UUID> dependencyIds;
     public Instant deadline;
     public Instant createdAt;
     public Instant updatedAt;
