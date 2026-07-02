@@ -122,6 +122,9 @@ public class ProjectStatusService {
         if (request.getColor() != null) {
             status.setColor(request.getColor());
         }
+        if (request.getStatusCategory() != null) {
+            status.setStatusCategory(request.getStatusCategory());
+        }
 
         statusRepository.save(status);
         return toResponse(status);
