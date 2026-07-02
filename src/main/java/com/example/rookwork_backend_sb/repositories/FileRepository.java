@@ -14,6 +14,9 @@ import java.util.UUID;
 public interface FileRepository extends JpaRepository<File, UUID> {
     List<File> findByIssueId(UUID issueId);
 
+    @Query("SELECT COALESCE(SUM(f.sizeBytes), 0) FROM File f WHERE f.issue.project.id = :projectId")
+    long sumSizeBytesByProjectId(@Param("projectId") UUID projectId);
+
     @Query("SELECT f FROM File f JOIN f.issue i JOIN i.project p JOIN p.projectMembers pm WHERE pm.user.id = :userId AND " +
            "LOWER(f.originalName) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<File> searchFilesForUser(@Param("userId") UUID userId, @Param("query") String query);

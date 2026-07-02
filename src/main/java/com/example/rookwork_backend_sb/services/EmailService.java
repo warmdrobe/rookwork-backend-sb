@@ -142,6 +142,15 @@ public class EmailService {
         renderAndSend(toEmail, "Rookwork Account Verification Code", "email/otp-email", ctx);
     }
 
+    @Async("emailExecutor")
+    public void sendPasswordResetOtpEmail(String toEmail, String otpCode) {
+        Context ctx = new Context();
+        ctx.setVariable("otpCode", otpCode);
+
+        log.info("[OTP PASSWORD CHANGE] Sending OTP {} to email {}", otpCode, toEmail);
+        renderAndSend(toEmail, "Rookwork Password Change Verification Code", "email/otp-email", ctx);
+    }
+
     private void send(String toEmail, String subject, String htmlBody) {
         try {
             SendEmailRequest request = SendEmailRequest.builder()

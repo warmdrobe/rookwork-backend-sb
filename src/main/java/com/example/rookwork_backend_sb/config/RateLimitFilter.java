@@ -102,7 +102,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private Integer resolveLimit(String path) {
         if (path.equals("/api/auth/login")
                 || path.equals("/api/auth/forgot-password")
-                || path.equals("/api/auth/reset-password")) {
+                || path.equals("/api/auth/reset-password")
+                || path.equals("/api/auth/register")
+                || path.equals("/api/auth/verify-otp")
+                || path.equals("/api/auth/resend-otp")) {
             return AUTH_LIMIT_PER_MINUTE;
         }
         if (path.startsWith("/api/invitations")) {

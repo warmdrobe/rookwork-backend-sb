@@ -32,4 +32,7 @@ public class UserSummary {
     public boolean notifyEventInvited;
     public String role;
     public String systemRole;
+    public boolean hasPassword;
+    public boolean passwordLimitReached;
+    public int passwordChangesThisMonth;
 }

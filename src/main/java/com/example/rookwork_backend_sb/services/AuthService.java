@@ -76,7 +76,11 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!user.isActive()) {
-            throw new UnauthorizedException("Account has not been activated via OTP");
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                throw new UnauthorizedException("Account has not been activated via OTP");
+            }
         }
 
         try {
@@ -108,12 +112,16 @@ public class AuthService {
      * @throws ConflictException if the email is already registered
      */
     private String generateOtp() {
-        java.util.Random random = new java.util.Random();
+        java.security.SecureRandom random = new java.security.SecureRandom();
         int code = 100000 + random.nextInt(900000);
         return String.valueOf(code);
     }
 
     public RegisterResponse register(AuthRegister dto) {
+        if (dto.getEmail() == null || !dto.getEmail().matches("^[a-zA-Z0-9._%+-]+@gmail\\.com$")) {
+            throw new BadRequestException("Only @gmail.com emails are accepted");
+        }
+
         java.util.Optional<User> existingUserOpt = userRepository.findByEmail(dto.getEmail());
         User user;
         String otp = generateOtp();
@@ -121,9 +129,27 @@ public class AuthService {
 
         if (existingUserOpt.isPresent()) {
             user = existingUserOpt.get();
-            if (user.isActive()) {
+            if (user.isVerified()) {
                 throw new ConflictException("Email already in use");
             }
+
+            // Prevent password/profile hijacking
+            if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
+                if (user.getOtpExpiry() != null && user.getOtpExpiry().isAfter(Instant.now())) {
+                    throw new ConflictException("A registration is already pending for this email. Please verify the OTP or wait for it to expire.");
+                }
+            }
+
+            // Cooldown check for re-registering (limit to 1 minute between OTP requests)
+            if (user.getOtpExpiry() != null) {
+                Instant lastSent = user.getOtpExpiry().minus(5, ChronoUnit.MINUTES);
+                Instant cooldownEnd = lastSent.plus(1, ChronoUnit.MINUTES);
+                if (Instant.now().isBefore(cooldownEnd)) {
+                    long secondsRemaining = ChronoUnit.SECONDS.between(Instant.now(), cooldownEnd);
+                    throw new BadRequestException("Please wait " + secondsRemaining + " seconds before registering again.");
+                }
+            }
+
             // Update the placeholder user's registration fields but keep it inactive
             user.setProfileName(dto.getProfileName());
             user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
@@ -131,6 +157,7 @@ public class AuthService {
             user.setVerified(false);
             user.setOtpCode(otp);
             user.setOtpExpiry(expiry);
+            user.setOtpFailedAttempts(0);
             user.setUpdatedAt(Instant.now());
             userRepository.save(user);
         } else {
@@ -143,6 +170,7 @@ public class AuthService {
                     .isVerified(false)
                     .otpCode(otp)
                     .otpExpiry(expiry)
+                    .otpFailedAttempts(0)
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
                     .build();
@@ -160,16 +188,27 @@ public class AuthService {
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (user.isActive() && user.isVerified()) {
+        if (user.isVerified()) {
             throw new ConflictException("User is already verified");
-        }
-
-        if (user.getOtpCode() == null || !user.getOtpCode().equals(dto.getOtp())) {
-            throw new BadRequestException("Invalid OTP code");
         }
 
         if (user.getOtpExpiry() == null || user.getOtpExpiry().isBefore(Instant.now())) {
             throw new BadRequestException("OTP code has expired");
+        }
+
+        if (user.getOtpCode() == null || !user.getOtpCode().equals(dto.getOtp())) {
+            int attempts = user.getOtpFailedAttempts() + 1;
+            user.setOtpFailedAttempts(attempts);
+            if (attempts >= 5) {
+                user.setOtpCode(null);
+                user.setOtpExpiry(null);
+                user.setOtpFailedAttempts(0);
+                userRepository.save(user);
+                throw new BadRequestException("Too many failed OTP attempts. A new OTP must be requested.");
+            } else {
+                userRepository.save(user);
+                throw new BadRequestException("Invalid OTP code. Remaining attempts: " + (5 - attempts));
+            }
         }
 
         // Activate and verify the user
@@ -177,6 +216,7 @@ public class AuthService {
         user.setVerified(true);
         user.setOtpCode(null);
         user.setOtpExpiry(null);
+        user.setOtpFailedAttempts(0);
         userRepository.save(user);
 
         // Auto-join to projects they were invited to
@@ -227,8 +267,18 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (user.isActive() && user.isVerified()) {
+        if (user.isVerified()) {
             throw new ConflictException("User is already verified");
+        }
+
+        // Cooldown check for resending OTP (limit to 1 minute between OTP requests)
+        if (user.getOtpExpiry() != null) {
+            Instant lastSent = user.getOtpExpiry().minus(5, ChronoUnit.MINUTES);
+            Instant cooldownEnd = lastSent.plus(1, ChronoUnit.MINUTES);
+            if (Instant.now().isBefore(cooldownEnd)) {
+                long secondsRemaining = ChronoUnit.SECONDS.between(Instant.now(), cooldownEnd);
+                throw new BadRequestException("Please wait " + secondsRemaining + " seconds before requesting another OTP.");
+            }
         }
 
         String otp = generateOtp();
@@ -236,6 +286,7 @@ public class AuthService {
 
         user.setOtpCode(otp);
         user.setOtpExpiry(expiry);
+        user.setOtpFailedAttempts(0);
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
@@ -254,6 +305,10 @@ public class AuthService {
         User user = userRepository.findByRefreshTokenHash(
                         hashToken(refreshToken))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
+
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is inactive or suspended");
+        }
 
         // Validate that the refresh token is still within its expiration window
         if (user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
@@ -314,6 +369,16 @@ public class AuthService {
                     .build();
             return userRepository.save(newUser);
         });
+
+        if (!user.isActive()) {
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                user.setActive(true);
+                user.setVerified(true);
+                userRepository.save(user);
+            }
+        }
 
         boolean updated = false;
         // Always sync the latest Google avatar URL on each login
