@@ -50,8 +50,19 @@ public class UserController {
   public ResponseEntity<UserSummary> getCurrentUser() {
     UUID userId = securityUtil.getCurrentUserId();
     User user = userRepository.findById(userId)
-
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    boolean limitReached = false;
+    int changesThisMonth = 0;
+    if (user.getLastPasswordChangeAt() != null) {
+      java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+      java.time.ZonedDateTime lastZoned = user.getLastPasswordChangeAt().atZone(java.time.ZoneOffset.UTC);
+      if (nowZoned.getYear() == lastZoned.getYear() && nowZoned.getMonthValue() == lastZoned.getMonthValue()) {
+        changesThisMonth = user.getPasswordChangesThisMonth();
+        limitReached = changesThisMonth >= 2;
+      }
+    }
+
     return ResponseEntity.ok(UserSummary.builder()
         .id(user.getId())
         .profileName(user.getProfileName())
@@ -71,6 +82,9 @@ public class UserController {
         .systemRole(user.getSystemRole().name())
         .notifyComment(user.isNotifyComment())
         .notifyEventInvited(user.isNotifyEventInvited())
+        .hasPassword(user.getPasswordHash() != null)
+        .passwordLimitReached(limitReached)
+        .passwordChangesThisMonth(changesThisMonth)
         .build());
   }
 
@@ -108,6 +122,13 @@ public class UserController {
     UUID userId = securityUtil.getCurrentUserId();
     userService.updateNotifications(userId, request);
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/me/password/request-otp")
+  public ResponseEntity<Void> requestPasswordOtp() {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.requestPasswordOtp(userId);
+    return ResponseEntity.ok().build();
   }
 
   @PutMapping("/me/password")

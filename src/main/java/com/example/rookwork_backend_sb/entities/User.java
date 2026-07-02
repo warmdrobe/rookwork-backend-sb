@@ -22,7 +22,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="email", nullable = false)
+    @Column(name="email", nullable = false, unique = true)
     private String email;
 
     @Column(name="profile_name")
@@ -115,6 +115,13 @@ public class User {
     @Column(name = "otp_failed_attempts", nullable = false)
     @Builder.Default
     private int otpFailedAttempts = 0;
+
+    @Column(name = "last_password_change_at")
+    private java.time.Instant lastPasswordChangeAt;
+
+    @Column(name = "password_changes_this_month", nullable = false)
+    @Builder.Default
+    private int passwordChangesThisMonth = 0;
 
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();

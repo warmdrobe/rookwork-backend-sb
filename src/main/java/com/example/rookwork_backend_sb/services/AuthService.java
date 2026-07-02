@@ -76,7 +76,11 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!user.isActive()) {
-            throw new UnauthorizedException("Account has not been activated via OTP");
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                throw new UnauthorizedException("Account has not been activated via OTP");
+            }
         }
 
         try {
@@ -108,12 +112,16 @@ public class AuthService {
      * @throws ConflictException if the email is already registered
      */
     private String generateOtp() {
-        java.util.Random random = new java.util.Random();
+        java.security.SecureRandom random = new java.security.SecureRandom();
         int code = 100000 + random.nextInt(900000);
         return String.valueOf(code);
     }
 
     public RegisterResponse register(AuthRegister dto) {
+        if (dto.getEmail() == null || !dto.getEmail().matches("^[a-zA-Z0-9._%+-]+@gmail\\.com$")) {
+            throw new BadRequestException("Only @gmail.com emails are accepted");
+        }
+
         java.util.Optional<User> existingUserOpt = userRepository.findByEmail(dto.getEmail());
         User user;
         String otp = generateOtp();
@@ -298,6 +306,10 @@ public class AuthService {
                         hashToken(refreshToken))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is inactive or suspended");
+        }
+
         // Validate that the refresh token is still within its expiration window
         if (user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
             throw new UnauthorizedException("Refresh token expired");
@@ -357,6 +369,16 @@ public class AuthService {
                     .build();
             return userRepository.save(newUser);
         });
+
+        if (!user.isActive()) {
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                user.setActive(true);
+                user.setVerified(true);
+                userRepository.save(user);
+            }
+        }
 
         boolean updated = false;
         // Always sync the latest Google avatar URL on each login
