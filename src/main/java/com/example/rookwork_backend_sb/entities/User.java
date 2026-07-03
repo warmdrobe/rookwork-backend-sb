@@ -25,7 +25,7 @@ public class User {
     @Column(name="email", nullable = false, unique = true)
     private String email;
 
-    @Column(name="profile_name")
+    @Column(name="profile_name", length = 50)
     private String profileName;
 
     @Column(name="picture")
@@ -52,10 +52,10 @@ public class User {
     @Column(name="updated_at")
     private Instant updatedAt;
 
-    @Column(name="job_title")
+    @Column(name="job_title", length = 100)
     private String jobTitle;
 
-    @Column(name="organization")
+    @Column(name="organization", length = 100)
     private String organization;
 
     @Enumerated(EnumType.STRING)
@@ -63,7 +63,7 @@ public class User {
     @Builder.Default
     private SystemRole systemRole = SystemRole.USER;
 
-    @Column(name="location")
+    @Column(name="location", length = 150)
     private String location;
 
     @Column(name="email_public")

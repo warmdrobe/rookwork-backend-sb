@@ -1,6 +1,7 @@
 package com.example.rookwork_backend_sb.dtos.issues;
 
 import com.example.rookwork_backend_sb.entities.PriorityType;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,7 +12,9 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 public class UpdateIssueRequest {
+    @Size(max = 200, message = "Issue name must not exceed 200 characters")
     public String issueName;
+    @Size(max = 10000, message = "Description must not exceed 10000 characters")
     public String description;
     public UUID issueTypeId;
     public PriorityType priority;

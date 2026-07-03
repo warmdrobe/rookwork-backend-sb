@@ -33,7 +33,7 @@ public class Project {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name="project_name", nullable = false)
+    @Column(name="project_name", nullable = false, length = 100)
     private  String projectName;
 
     //Project <-> ProjectMember <-> User
