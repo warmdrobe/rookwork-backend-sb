@@ -200,10 +200,19 @@ public class IssueService {
             }
         }
 
+        // Validate date order: deadline must not be before start date
+        Instant tempStartDate = request.getStartDate() != null ? request.getStartDate() : issue.getStartDate();
+        Instant tempDeadline = request.getDeadline() != null ? request.getDeadline() : issue.getDeadline();
+        if (tempStartDate != null && tempDeadline != null) {
+            if (tempDeadline.isBefore(tempStartDate)) {
+                throw new BadRequestException("Deadline cannot be before start date");
+            }
+        }
+
         boolean startDateChanged = false;
         Instant oldStartDate = issue.getStartDate() != null ? issue.getStartDate() : issue.getCreatedAt();
         if (request.getStartDate() != null) {
-            Instant newStartDate = request.getStartDate().atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant newStartDate = request.getStartDate();
             if (!oldStartDate.equals(newStartDate)) {
                 issue.setStartDate(newStartDate);
                 startDateChanged = true;
@@ -212,7 +221,7 @@ public class IssueService {
 
         Instant oldDeadline = issue.getDeadline();
         if (request.getDeadline() != null) {
-            Instant newDeadline = request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant newDeadline = request.getDeadline();
             if (oldDeadline == null ? newDeadline != null : !oldDeadline.equals(newDeadline)) {
                 issue.setDeadline(newDeadline);
                 deadlineChanged = true;
@@ -306,13 +315,13 @@ public class IssueService {
             // Apply cascading shifts
             long startShift = 0;
             if (startDateChanged && request.getStartDate() != null) {
-                Instant newStartDate = request.getStartDate().atStartOfDay(ZoneOffset.UTC).toInstant();
+                Instant newStartDate = request.getStartDate();
                 startShift = newStartDate.toEpochMilli() - oldStartDate.toEpochMilli();
             }
 
             long deadlineShift = 0;
             if (deadlineChanged && request.getDeadline() != null) {
-                Instant newDeadline = request.getDeadline().atStartOfDay(ZoneOffset.UTC).toInstant();
+                Instant newDeadline = request.getDeadline();
                 Instant prevDeadline = oldDeadline != null ? oldDeadline : oldStartDate.plusMillis(7 * 24 * 60 * 60 * 1000L);
                 deadlineShift = newDeadline.toEpochMilli() - prevDeadline.toEpochMilli();
             }

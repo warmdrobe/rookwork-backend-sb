@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,8 +18,8 @@ public class UpdateIssueRequest {
     public String description;
     public UUID issueTypeId;
     public PriorityType priority;
-    public LocalDate startDate;
-    public LocalDate deadline;
+    public Instant startDate;
+    public Instant deadline;
     /** null = không thay đổi, [] = xóa hết assignee, [id1,id2] = set mới */
     public List<UUID> assigneeIds;
     public List<UUID> dependencyIds;
