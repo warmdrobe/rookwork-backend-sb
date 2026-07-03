@@ -52,17 +52,6 @@ public class UserController {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-    boolean limitReached = false;
-    int changesThisMonth = 0;
-    if (user.getLastPasswordChangeAt() != null) {
-      java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
-      java.time.ZonedDateTime lastZoned = user.getLastPasswordChangeAt().atZone(java.time.ZoneOffset.UTC);
-      if (nowZoned.getYear() == lastZoned.getYear() && nowZoned.getMonthValue() == lastZoned.getMonthValue()) {
-        changesThisMonth = user.getPasswordChangesThisMonth();
-        limitReached = changesThisMonth >= 2;
-      }
-    }
-
     return ResponseEntity.ok(UserSummary.builder()
         .id(user.getId())
         .profileName(user.getProfileName())
@@ -83,8 +72,8 @@ public class UserController {
         .notifyComment(user.isNotifyComment())
         .notifyEventInvited(user.isNotifyEventInvited())
         .hasPassword(user.getPasswordHash() != null)
-        .passwordLimitReached(limitReached)
-        .passwordChangesThisMonth(changesThisMonth)
+        .passwordLimitReached(userService.isPasswordLimitReached(user))
+        .passwordChangesThisMonth(userService.getPasswordChangesThisMonthCalculated(user))
         .build());
   }
 

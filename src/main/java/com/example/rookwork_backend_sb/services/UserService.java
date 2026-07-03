@@ -136,14 +136,8 @@ public class UserService {
         }
 
         // Check password change frequency limit (2 times/month)
-        java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
-        if (user.getLastPasswordChangeAt() != null) {
-            java.time.ZonedDateTime lastZoned = user.getLastPasswordChangeAt().atZone(java.time.ZoneOffset.UTC);
-            if (nowZoned.getYear() == lastZoned.getYear() && nowZoned.getMonthValue() == lastZoned.getMonthValue()) {
-                if (user.getPasswordChangesThisMonth() >= 2) {
-                    throw new BadRequestException("You can only change your password up to 2 times per month");
-                }
-            }
+        if (isPasswordLimitReached(user)) {
+            throw new BadRequestException("You can only change your password up to 2 times per month");
         }
 
         if (user.getOtpExpiry() != null) {
@@ -169,20 +163,10 @@ public class UserService {
         User user = getUserOrThrow(userId);
 
         // Check password change frequency limit (2 times/month)
-        java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
-        if (user.getLastPasswordChangeAt() != null) {
-            java.time.ZonedDateTime lastZoned = user.getLastPasswordChangeAt().atZone(java.time.ZoneOffset.UTC);
-            if (nowZoned.getYear() == lastZoned.getYear() && nowZoned.getMonthValue() == lastZoned.getMonthValue()) {
-                if (user.getPasswordChangesThisMonth() >= 2) {
-                    throw new BadRequestException("You can only change your password up to 2 times per month");
-                }
-                user.setPasswordChangesThisMonth(user.getPasswordChangesThisMonth() + 1);
-            } else {
-                user.setPasswordChangesThisMonth(1);
-            }
-        } else {
-            user.setPasswordChangesThisMonth(1);
+        if (isPasswordLimitReached(user)) {
+            throw new BadRequestException("You can only change your password up to 2 times per month");
         }
+        user.setPasswordChangesThisMonth(getPasswordChangesThisMonthCalculated(user) + 1);
 
         if (user.getPasswordHash() != null) {
             if (request.getOtp() == null || request.getOtp().trim().isEmpty()) {
@@ -244,6 +228,22 @@ public class UserService {
         if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
             throw new BadRequestException("Password must contain at least one special character");
         }
+    }
+
+    public int getPasswordChangesThisMonthCalculated(User user) {
+        if (user.getLastPasswordChangeAt() == null) {
+            return 0;
+        }
+        java.time.ZonedDateTime nowZoned = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+        java.time.ZonedDateTime lastZoned = user.getLastPasswordChangeAt().atZone(java.time.ZoneOffset.UTC);
+        if (nowZoned.getYear() == lastZoned.getYear() && nowZoned.getMonthValue() == lastZoned.getMonthValue()) {
+            return user.getPasswordChangesThisMonth();
+        }
+        return 0;
+    }
+
+    public boolean isPasswordLimitReached(User user) {
+        return getPasswordChangesThisMonthCalculated(user) >= 2;
     }
 
     private User getUserOrThrow(UUID userId) {
