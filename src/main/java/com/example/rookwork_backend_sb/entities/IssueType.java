@@ -26,7 +26,7 @@ public class IssueType {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column(columnDefinition = "text")
+    @Column(length = 500)
     private String description;
 
     @Column(name = "icon_key", length = 100, nullable = false)

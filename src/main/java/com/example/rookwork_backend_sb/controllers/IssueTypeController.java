@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.issues.CreateIssueTypeRequest;
 import com.example.rookwork_backend_sb.dtos.issues.IssueIconOption;
 import com.example.rookwork_backend_sb.dtos.issues.IssueTypeResponse;
 import com.example.rookwork_backend_sb.services.IssueTypeService;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,7 +28,7 @@ public class IssueTypeController {
     @PostMapping("api/projects/{projectId}/issue-types")
     public ResponseEntity<IssueTypeResponse> createIssueType(
             @PathVariable UUID projectId,
-            @RequestBody CreateIssueTypeRequest request) {
+            @Valid @RequestBody CreateIssueTypeRequest request) {
         return ResponseEntity.ok(issueTypeService.createIssueType(projectId, request));
     }
 

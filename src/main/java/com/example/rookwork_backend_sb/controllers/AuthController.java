@@ -8,6 +8,7 @@ import com.example.rookwork_backend_sb.dtos.auth.VerifyOtpRequest;
 import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.dtos.auth.RefreshRequest;
 import com.example.rookwork_backend_sb.services.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,7 +62,7 @@ public class AuthController {
    * @return response entity containing confirmation status
    */
   @PostMapping("/register")
-  public ResponseEntity<RegisterResponse> register(@RequestBody AuthRegister authRegister) {
+  public ResponseEntity<RegisterResponse> register(@Valid @RequestBody AuthRegister authRegister) {
     return ResponseEntity.ok(authService.register(authRegister));
   }
 

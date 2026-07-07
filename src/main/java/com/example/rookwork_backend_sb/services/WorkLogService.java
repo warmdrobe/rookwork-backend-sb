@@ -140,9 +140,19 @@ public class WorkLogService {
      *
      * @return a WorkStatsResponse containing daily breakdown
      */
-    public WorkStatsResponse getWeeklyStats() {
+    public WorkStatsResponse getWeeklyStats(String timezone) {
         UUID userId = securityUtil.getCurrentUserId();
-        LocalDate today = LocalDate.now();
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        if (timezone != null && !timezone.isEmpty()) {
+            try {
+                zoneId = ZoneId.of(timezone);
+            } catch (Exception e) {
+                // fallback to systemDefault
+            }
+        }
+
+        LocalDate today = LocalDate.now(zoneId);
 
         LocalDate thisWeekStart = today.with(DayOfWeek.MONDAY);
         LocalDate thisWeekEnd = thisWeekStart.plusDays(6);
@@ -150,26 +160,31 @@ public class WorkLogService {
         LocalDate lastWeekEnd = lastWeekStart.plusDays(6);
 
         return WorkStatsResponse.builder()
-                .thisWeek(buildDailyHours(userId, thisWeekStart, thisWeekEnd))
-                .lastWeek(buildDailyHours(userId, lastWeekStart, lastWeekEnd))
+                .thisWeek(buildDailyHours(userId, thisWeekStart, thisWeekEnd, zoneId))
+                .lastWeek(buildDailyHours(userId, lastWeekStart, lastWeekEnd, zoneId))
                 .build();
     }
 
-    /**
-     * Aggregates monthly work stats (this year vs last year) for the current user.
-     *
-     * @return a WorkStatsResponse containing monthly breakdown
-     */
-    public WorkStatsResponse getMonthlyStats() {
+    public WorkStatsResponse getMonthlyStats(String timezone) {
         UUID userId = securityUtil.getCurrentUserId();
-        LocalDate today = LocalDate.now();
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        if (timezone != null && !timezone.isEmpty()) {
+            try {
+                zoneId = ZoneId.of(timezone);
+            } catch (Exception e) {
+                // fallback to systemDefault
+            }
+        }
+
+        LocalDate today = LocalDate.now(zoneId);
 
         LocalDate thisYearStart = today.withDayOfYear(1);
         LocalDate lastYearStart = thisYearStart.minusYears(1);
 
         return WorkStatsResponse.builder()
-                .thisWeek(buildMonthlyHours(userId, thisYearStart, thisYearStart.plusYears(1).minusDays(1)))
-                .lastWeek(buildMonthlyHours(userId, lastYearStart, thisYearStart.minusDays(1)))
+                .thisWeek(buildMonthlyHours(userId, thisYearStart, thisYearStart.plusYears(1).minusDays(1), zoneId))
+                .lastWeek(buildMonthlyHours(userId, lastYearStart, thisYearStart.minusDays(1), zoneId))
                 .build();
     }
 
@@ -195,16 +210,16 @@ public class WorkLogService {
     }
 
     private List<WorkStatsResponse.DailyHours> buildDailyHours(
-            UUID userId, LocalDate from, LocalDate to) {
+            UUID userId, LocalDate from, LocalDate to, ZoneId zoneId) {
 
         List<WorkLog> logs = workLogRepository.findAllByUser_IdAndLoggedAtBetween(
                 userId,
-                from.atStartOfDay(ZoneOffset.UTC).toInstant(),
-                to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
+                from.atStartOfDay(zoneId).toInstant(),
+                to.atTime(LocalTime.MAX).atZone(zoneId).toInstant()
         );
         Map<LocalDate, BigDecimal> map = logs.stream()
                 .collect(Collectors.groupingBy(
-                        log -> LocalDate.ofInstant(log.getLoggedAt(), ZoneOffset.UTC),
+                        log -> log.getLoggedAt().atZone(zoneId).toLocalDate(),
                         Collectors.reducing(BigDecimal.ZERO, WorkLog::getHours, BigDecimal::add)
                 ));
 
@@ -221,16 +236,16 @@ public class WorkLogService {
     }
 
     private List<WorkStatsResponse.DailyHours> buildMonthlyHours(
-            UUID userId, LocalDate from, LocalDate to) {
+            UUID userId, LocalDate from, LocalDate to, ZoneId zoneId) {
 
         List<WorkLog> logs = workLogRepository.findAllByUser_IdAndLoggedAtBetween(
                 userId,
-                from.atStartOfDay(ZoneOffset.UTC).toInstant(),
-                to.atTime(LocalTime.MAX).atZone(ZoneOffset.UTC).toInstant()
+                from.atStartOfDay(zoneId).toInstant(),
+                to.atTime(LocalTime.MAX).atZone(zoneId).toInstant()
         );
         Map<Month, BigDecimal> map = new EnumMap<>(Month.class);
         for (WorkLog log : logs) {
-            LocalDate date = LocalDate.ofInstant(log.getLoggedAt(), ZoneOffset.UTC);
+            LocalDate date = log.getLoggedAt().atZone(zoneId).toLocalDate();
             map.merge(date.getMonth(), log.getHours(), BigDecimal::add);
         }
 
