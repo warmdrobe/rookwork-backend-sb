@@ -1,3 +1,4 @@
+
 package com.example.rookwork_backend_sb.controllers;
 
 import com.example.rookwork_backend_sb.entities.Project;
@@ -125,9 +126,9 @@ public class AdminController {
 
         Map<String, Long> issueDistribution = new HashMap<>();
         issueDistribution.put("To do", todoCount > 0 ? todoCount : 138L);
-        issueDistribution.put("Đang làm", doingCount > 0 ? doingCount : 96L);
+        issueDistribution.put("In Progress", doingCount > 0 ? doingCount : 96L);
         issueDistribution.put("Review", reviewCount > 0 ? reviewCount : 62L);
-        issueDistribution.put("Hoàn thành", doneCount > 0 ? doneCount : 51L);
+        issueDistribution.put("Completed", doneCount > 0 ? doneCount : 51L);
 
         // Recent registered workspaces (projects)
         List<RecentWorkspace> recentWorkspaces = projectRepository.findAll().stream()
@@ -338,9 +339,9 @@ public class AdminController {
 
         List<SystemLog> logs = Arrays.asList(
                 new SystemLog("err", "500 Internal Error — /api/tasks/bulk-update", "12:04:31 · server-eu-3"),
-                new SystemLog("warn", "Độ trễ database vượt 300ms", "11:48:02 · db-primary"),
-                new SystemLog("ok", "Triển khai phiên bản v4.12.0 thành công", "09:15:47 · ci/cd"),
-                new SystemLog("ok", "Sao lưu dữ liệu định kỳ hoàn tất", "03:00:00 · backup-worker")
+                new SystemLog("warn", "Database connection latency exceeded 300ms", "11:48:02 · db-primary"),
+                new SystemLog("ok", "Successfully deployed release bundle v4.12.0 to cluster", "09:15:47 · ci/cd"),
+                new SystemLog("ok", "Automated system data snapshots completed", "03:00:00 · backup-worker")
         );
 
         SystemHealthResponse health = SystemHealthResponse.builder()

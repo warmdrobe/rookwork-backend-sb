@@ -563,6 +563,7 @@ public class CommentService {
         }
 
         String newType = request.getReactionType();
+        final boolean[] shouldNotify = {false};
 
         commentReactionRepository.findByCommentIdAndUserId(commentId, currentUserId)
                 .ifPresentOrElse(
@@ -575,6 +576,7 @@ public class CommentService {
                                 existing.setReactionType(newType);
                                 existing.setCreatedAt(Instant.now());
                                 commentReactionRepository.save(existing);
+                                shouldNotify[0] = true;
                             }
                         },
                         () -> {
@@ -586,8 +588,47 @@ public class CommentService {
                                     .createdAt(Instant.now())
                                     .build();
                             commentReactionRepository.save(reaction);
+                            shouldNotify[0] = true;
                         }
                 );
+
+        // Notify comment author
+        if (shouldNotify[0] && !comment.getUser().getId().equals(currentUserId)) {
+            User commentAuthor = comment.getUser();
+            String commentText = comment.getContent();
+            String plainText = commentText != null ? Jsoup.parse(commentText).text() : "";
+            String preview = plainText.length() > 30 ? plainText.substring(0, 30) + "..." : plainText;
+
+            Notification notification = Notification.builder()
+                    .user(commentAuthor)
+                    .sender(currentUser)
+                    .issue(comment.getIssue())
+                    .title("New reaction on your comment")
+                    .message(String.format("%s reacted %s to your comment: \"%s\"",
+                            currentUser.getProfileName(),
+                            newType,
+                            preview))
+                    .isRead(false)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            notificationRepository.save(notification);
+
+            // Send notification real-time via WebSocket
+            simpMessagingTemplate.convertAndSendToUser(
+                    commentAuthor.getId().toString(),
+                    "/queue/notifications",
+                    Map.of(
+                            "type", "COMMENT_REACTION",
+                            "notificationId", notification.getId(),
+                            "issueId", comment.getIssue().getId(),
+                            "issueName", comment.getIssue().getIssueName(),
+                            "projectName", comment.getIssue().getProject().getProjectName(),
+                            "reactedBy", currentUser.getProfileName(),
+                            "reactionType", newType
+                    )
+            );
+        }
 
         // Tổng hợp danh sách reactions mới nhất
         List<CommentReaction> rawReactions = commentReactionRepository.findByCommentId(commentId);
