@@ -1,6 +1,7 @@
 package com.example.rookwork_backend_sb.services;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +13,14 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.rookwork_backend_sb.dtos.UserSummary;
+import com.example.rookwork_backend_sb.dtos.comments.CommentReactionResponse;
 import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
 import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
+import com.example.rookwork_backend_sb.dtos.comments.ReactCommentRequest;
 import com.example.rookwork_backend_sb.entities.ActivityAction;
 import com.example.rookwork_backend_sb.entities.ActivityEntityType;
 import com.example.rookwork_backend_sb.entities.Comment;
+import com.example.rookwork_backend_sb.entities.CommentReaction;
 import com.example.rookwork_backend_sb.entities.Issue;
 import com.example.rookwork_backend_sb.entities.Notification;
 import com.example.rookwork_backend_sb.entities.Project;
@@ -27,6 +31,7 @@ import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
+import com.example.rookwork_backend_sb.repositories.CommentReactionRepository;
 import com.example.rookwork_backend_sb.repositories.CommentRepository;
 import com.example.rookwork_backend_sb.repositories.IssueRepository;
 import com.example.rookwork_backend_sb.repositories.NotificationRepository;
@@ -58,6 +63,7 @@ public class CommentService {
     private final NotificationRepository notificationRepository;
     private final SecurityUtil securityUtil;
     private final CommentRepository commentRepository;
+    private final CommentReactionRepository commentReactionRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
     private final S3Service s3Service;
@@ -133,6 +139,7 @@ public class CommentService {
                 .updatedAt(comment.getUpdatedAt())
                 .parentCommentId(parent != null ? parent.getId() : null)
                 .replies(Set.of())
+                .reactions(List.of())
                 .build();
 
         // Broadcast the new comment via WebSocket to all users viewing the issue
@@ -499,7 +506,122 @@ public class CommentService {
             response.setReplies(replies);
         }
 
+        // map reactions: nhóm theo reactionType, đếm số lượng và lấy danh sách user
+        List<CommentReaction> rawReactions = commentReactionRepository.findByCommentId(comment.getId());
+        List<CommentReactionResponse> reactions = rawReactions.stream()
+                .collect(Collectors.groupingBy(CommentReaction::getReactionType))
+                .entrySet().stream()
+                .map(entry -> {
+                    List<UserSummary> users = entry.getValue().stream()
+                            .map(r -> UserSummary.builder()
+                                    .id(r.getUser().getId())
+                                    .profileName(r.getUser().getProfileName())
+                                    .picture(s3Service.getAvatarUrl(r.getUser().getPicture()))
+                                    .build())
+                            .collect(Collectors.toList());
+                    return CommentReactionResponse.builder()
+                            .reactionType(entry.getKey())
+                            .count(users.size())
+                            .users(users)
+                            .build();
+                })
+                .collect(Collectors.toList());
+        response.setReactions(reactions);
+
         return response;
+    }
+
+    /**
+     * Xử lý thả / đổi / gỡ biểu cảm trên một bình luận.
+     * Quy tắc: Mỗi người dùng chỉ được có tối đa 1 reaction type per comment.
+     * - Nếu đã thả cùng loại emoji => gỡ bỏ (toggle off).
+     * - Nếu đã thả emoji khác => cập nhật sang loại mới.
+     * - Nếu chưa có => tạo mới.
+     *
+     * @param projectId ID của dự án
+     * @param issueId   ID của công việc
+     * @param commentId ID của bình luận
+     * @param request   Payload chứa reactionType
+     * @return Danh sách reactions mới nhất của bình luận đó
+     */
+    @Transactional
+    public List<CommentReactionResponse> reactToComment(
+            UUID projectId, UUID issueId, UUID commentId, ReactCommentRequest request) {
+
+        UUID currentUserId = securityUtil.getCurrentUserId();
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UnauthorizedException("Not authenticated"));
+
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Kiểm tra bình luận thuộc đúng issue và project
+        if (!comment.getIssue().getId().equals(issueId)
+                || !comment.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Comment does not belong to this issue or project");
+        }
+
+        String newType = request.getReactionType();
+
+        commentReactionRepository.findByCommentIdAndUserId(commentId, currentUserId)
+                .ifPresentOrElse(
+                        existing -> {
+                            if (existing.getReactionType().equals(newType)) {
+                                // Toggle off: cùng loại emoji -> xóa
+                                commentReactionRepository.delete(existing);
+                            } else {
+                                // Đổi sang emoji mới
+                                existing.setReactionType(newType);
+                                existing.setCreatedAt(Instant.now());
+                                commentReactionRepository.save(existing);
+                            }
+                        },
+                        () -> {
+                            // Chưa có reaction -> tạo mới
+                            CommentReaction reaction = CommentReaction.builder()
+                                    .comment(comment)
+                                    .user(currentUser)
+                                    .reactionType(newType)
+                                    .createdAt(Instant.now())
+                                    .build();
+                            commentReactionRepository.save(reaction);
+                        }
+                );
+
+        // Tổng hợp danh sách reactions mới nhất
+        List<CommentReaction> rawReactions = commentReactionRepository.findByCommentId(commentId);
+        List<CommentReactionResponse> updatedReactions = rawReactions.stream()
+                .collect(Collectors.groupingBy(CommentReaction::getReactionType))
+                .entrySet().stream()
+                .map(entry -> {
+                    List<UserSummary> users = entry.getValue().stream()
+                            .map(r -> UserSummary.builder()
+                                    .id(r.getUser().getId())
+                                    .profileName(r.getUser().getProfileName())
+                                    .picture(s3Service.getAvatarUrl(r.getUser().getPicture()))
+                                    .build())
+                            .collect(Collectors.toList());
+                    return CommentReactionResponse.builder()
+                            .reactionType(entry.getKey())
+                            .count(users.size())
+                            .users(users)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Phát tin nhắn WebSocket thông báo reactions đã được cập nhật
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "COMMENT_REACTION_UPDATED");
+        payload.put("commentId", commentId.toString());
+        payload.put("issueId", issueId.toString());
+        payload.put("reactions", updatedReactions);
+        simpMessagingTemplate.convertAndSend(
+                "/topic/project/" + projectId + "/issue/" + issueId + "/comments",
+                (Object) payload
+        );
+
+        return updatedReactions;
     }
 
     /**

@@ -45,4 +45,9 @@ public class Comment {
 
     @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Comment> replies = new HashSet<>();
+
+    /** Danh sách biểu cảm (reactions) của người dùng trên bình luận này. */
+    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<CommentReaction> reactions = new HashSet<>();
 }
