@@ -42,34 +42,74 @@ jobs:
         run: |
           aws s3 cp target/*.jar s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar
 
+      # ── Deploy EC2-1 trước, chờ hoàn thành ────────────────────────────────────
       - name: Deploy on EC2-1 via SSM
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ secrets.EC2_INSTANCE_ID_1 }} \
             --document-name "AWS-RunShellScript" \
             --region ap-southeast-1 \
             --parameters 'commands=[
-              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar",
-              "cd /home/ec2-user/rookwork-backend-sb",
+              "set -e",
+              "cd /home/ec2-user/rookwork-backend-sb && aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar ./rookwork-backend.jar",
+              "cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} .",
               "sudo docker stop rookwork-backend || true",
               "sudo docker rm rookwork-backend || true",
-              "sudo docker rmi rookwork-backend:${{ steps.version.outputs.VERSION }} || true",
-              "sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} .",
-              "sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL=${{ secrets.DB_URL }} -e DB_USERNAME=${{ secrets.DB_USERNAME }} -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_S3_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_SECRET_ACCESS_KEY }} -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} -e APP_EMAIL_FROM=${{ secrets.APP_EMAIL_FROM }} rookwork-backend:${{ steps.version.outputs.VERSION }}"
-            ]'
+              "sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL=${{ secrets.DB_URL }} -e DB_USERNAME=${{ secrets.DB_USERNAME }} -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} -e AWS_S3_ACCESS_KEY_ID=${{ secrets.AWS_S3_ACCESS_KEY_ID }} -e AWS_S3_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_SECRET_ACCESS_KEY }} -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} -e APP_EMAIL_FROM=${{ secrets.APP_EMAIL_FROM }} rookwork-backend:${{ steps.version.outputs.VERSION }}"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
 
+          echo "EC2-1 SSM Command ID: $COMMAND_ID"
+
+          # Chờ lệnh hoàn thành (tối đa ~10 phút mặc định)
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID_1 }}
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID_1 }} \
+            --query "Status" --output text)
+
+          echo "EC2-1 deploy status: $STATUS"
+          if [ "$STATUS" != "Success" ]; then
+            echo "EC2-1 deploy FAILED - dừng pipeline"
+            exit 1
+          fi
+
+      # ── Deploy EC2-2 sau khi EC2-1 thành công ─────────────────────────────────
       - name: Deploy on EC2-2 via SSM
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ secrets.EC2_INSTANCE_ID_2 }} \
             --document-name "AWS-RunShellScript" \
             --region ap-southeast-1 \
             --parameters 'commands=[
-              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar",
-              "cd /home/ec2-user/rookwork-backend-sb",
+              "set -e",
+              "cd /home/ec2-user/rookwork-backend-sb && aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar ./rookwork-backend.jar",
+              "cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} .",
               "sudo docker stop rookwork-backend || true",
               "sudo docker rm rookwork-backend || true",
-              "sudo docker rmi rookwork-backend:${{ steps.version.outputs.VERSION }} || true",
-              "sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} .",
-              "sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL=${{ secrets.DB_URL }} -e DB_USERNAME=${{ secrets.DB_USERNAME }} -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_S3_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_SECRET_ACCESS_KEY }} -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} -e APP_EMAIL_FROM=${{ secrets.APP_EMAIL_FROM }} rookwork-backend:${{ steps.version.outputs.VERSION }}"
-            ]'
+              "sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL=${{ secrets.DB_URL }} -e DB_USERNAME=${{ secrets.DB_USERNAME }} -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} -e AWS_S3_ACCESS_KEY_ID=${{ secrets.AWS_S3_ACCESS_KEY_ID }} -e AWS_S3_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_SECRET_ACCESS_KEY }} -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} -e APP_EMAIL_FROM=${{ secrets.APP_EMAIL_FROM }} rookwork-backend:${{ steps.version.outputs.VERSION }}"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "EC2-2 SSM Command ID: $COMMAND_ID"
+
+          # Chờ lệnh hoàn thành
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID_2 }}
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID_2 }} \
+            --query "Status" --output text)
+
+          echo "EC2-2 deploy status: $STATUS"
+          if [ "$STATUS" != "Success" ]; then
+            echo "EC2-2 deploy FAILED"
+            exit 1
+          fi
