@@ -59,14 +59,23 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, message, request.getRequestURI());
     }
 
+    // Bắt lỗi Optimistic Locking (concurrent reorder conflict) - 409
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockingFailure(
+            org.springframework.dao.OptimisticLockingFailureException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT,
+                "The resource was modified by another user. Please refresh and try again.",
+                request.getRequestURI());
+    }
+
     // Bắt tất cả exception còn lại (fallback - 500)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex, HttpServletRequest request) {
-
+        ex.printStackTrace(); // Log to console to debug 500 error
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "Internal server error",
+                ex.getMessage() != null ? ex.getMessage() : "Internal server error",
                 request.getRequestURI()
         );
     }

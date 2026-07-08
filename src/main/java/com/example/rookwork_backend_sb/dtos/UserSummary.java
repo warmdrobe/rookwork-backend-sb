@@ -28,5 +28,11 @@ public class UserSummary {
     public boolean notifyMentioned;
     public boolean notifyProjectUpdates;
     public boolean notifyDailyDigest;
+    public boolean notifyComment;
+    public boolean notifyEventInvited;
     public String role;
+    public String systemRole;
+    public boolean hasPassword;
+    public boolean passwordLimitReached;
+    public int passwordChangesThisMonth;
 }

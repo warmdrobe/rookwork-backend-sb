@@ -33,7 +33,7 @@ public class Project {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name="project_name", nullable = false)
+    @Column(name="project_name", nullable = false, length = 100)
     private  String projectName;
 
     //Project <-> ProjectMember <-> User
@@ -45,6 +45,12 @@ public class Project {
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Event> events = new HashSet<>();
+
+    /** Ordered workflow columns for this project's Kanban board. */
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @Builder.Default
+    private List<ProjectStatus> statuses = new ArrayList<>();
 
 
 }

@@ -40,7 +40,7 @@ public class WorkLog {
     @Column(name = "end_at")
     private Instant endAt;
 
-    @Column(columnDefinition = "text")
+    @Column(length = 500)
     private String note;
 
     @Column(name = "created_at")

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:replace="~{email/fragments/layout :: wrapper(~{::content})}">
+  <div th:fragment="content">
+    <h2 style="margin-top: 0; color: #dc2626; font-size: 20px; font-weight: 600;">Event Cancelled</h2>
+    <p style="font-size: 16px; color: #4b5563;">
+      The event <strong th:text="${eventName}"></strong> has been cancelled by the host (<span th:text="${cancelledByName}"></span>).
+    </p>
+    <div style="background-color: #fee2e2; border-left: 4px solid #dc2626; padding: 15px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; color: #991b1b;">
+      <p style="margin: 5px 0; font-size: 14px;"><strong>Event Cancelled:</strong> <span th:text="${eventName}"></span></p>
+      <p style="margin: 5px 0; font-size: 14px;"><strong>Previously Scheduled Time:</strong> <span th:text="${eventTime}"></span></p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

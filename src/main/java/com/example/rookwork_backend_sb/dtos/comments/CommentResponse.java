@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,4 +24,8 @@ public class CommentResponse {
   public Instant updatedAt;
   public UUID parentCommentId;
   public Set<CommentResponse> replies;
+
+  /** Danh sách biểu cảm tổng hợp theo loại emoji của bình luận này. */
+  public List<CommentReactionResponse> reactions;
 }
+

@@ -1,7 +1,9 @@
 package com.example.rookwork_backend_sb.controllers;
 
+import com.example.rookwork_backend_sb.dtos.comments.CommentReactionResponse;
 import com.example.rookwork_backend_sb.dtos.comments.CommentResponse;
 import com.example.rookwork_backend_sb.dtos.comments.CreateCommentRequest;
+import com.example.rookwork_backend_sb.dtos.comments.ReactCommentRequest;
 import com.example.rookwork_backend_sb.services.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -96,4 +98,23 @@ public class CommentController {
             @PathVariable UUID issueId) {
         return ResponseEntity.ok(commentService.getAllCommentByIssueId(projectId, issueId));
     }
-}
+
+    /**
+     * Thả / đổi / gỡ biểu cảm (reaction) trên một bình luận.
+     * Cơ chế toggle: click cùng emoji sẽ gỡ bỏ, click emoji khác sẽ đổi sang loại mới.
+     *
+     * @param projectId ID của dự án
+     * @param issueId   ID của công việc
+     * @param commentId ID của bình luận
+     * @param request   Payload chứa reactionType (chuỗi emoji)
+     * @return Danh sách reactions tổng hợp mới nhất của bình luận đó
+     */
+    @PostMapping("/issues/{issueId}/comments/{commentId}/reactions")
+    public ResponseEntity<List<CommentReactionResponse>> reactToComment(
+            @PathVariable UUID projectId,
+            @PathVariable UUID issueId,
+            @PathVariable UUID commentId,
+            @RequestBody ReactCommentRequest request) {
+        return ResponseEntity.ok(commentService.reactToComment(projectId, issueId, commentId, request));
+    }
+}

@@ -19,7 +19,7 @@ public class SubTask {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="subtask_name")
+    @Column(name="subtask_name", length = 200)
     private String subtaskName;
 
     @Column(name="subtask_description")
