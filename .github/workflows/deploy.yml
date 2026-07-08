@@ -71,7 +71,7 @@ jobs:
               if $aws_bucket != "" then "-e AWS_S3_BUCKET=" + ($aws_bucket | @sh) else empty end,
               if $email_from != "" then "-e APP_EMAIL_FROM=" + ($email_from | @sh) else empty end
             ] | join(" ") as $env_flags |
-            "aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }" as $cmd |
+            ("aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }") as $cmd |
             { "commands": [$cmd] }
             ' > ssm-params-ec2-1.json
 
@@ -141,7 +141,7 @@ jobs:
               if $aws_bucket != "" then "-e AWS_S3_BUCKET=" + ($aws_bucket | @sh) else empty end,
               if $email_from != "" then "-e APP_EMAIL_FROM=" + ($email_from | @sh) else empty end
             ] | join(" ") as $env_flags |
-            "aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }" as $cmd |
+            ("aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }") as $cmd |
             { "commands": [$cmd] }
             ' > ssm-params-ec2-2.json
 
