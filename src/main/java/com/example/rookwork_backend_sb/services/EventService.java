@@ -177,7 +177,7 @@ public class EventService {
     }
 
     private String formatInstant(Instant instant) {
-        if (instant == null) return "Không có";
+        if (instant == null) return "None";
         return EVENT_DATE_FORMATTER.format(instant) + " (GMT+7)";
     }
 
@@ -271,16 +271,16 @@ public class EventService {
 
         List<String> changes = new ArrayList<>();
         if (!Objects.equals(oldName, event.getEventName())) {
-            changes.add(String.format("Tên sự kiện: \"%s\" -> \"%s\"", oldName, event.getEventName()));
+            changes.add(String.format("Event name: \"%s\" -> \"%s\"", oldName, event.getEventName()));
         }
         if (!Objects.equals(oldStart, event.getStartTime())) {
-            changes.add(String.format("Thời gian bắt đầu: %s -> %s", formatInstant(oldStart), formatInstant(event.getStartTime())));
+            changes.add(String.format("Start time: %s -> %s", formatInstant(oldStart), formatInstant(event.getStartTime())));
         }
         if (!Objects.equals(oldEnd, event.getEndTime())) {
-            changes.add(String.format("Thời gian kết thúc: %s -> %s", formatInstant(oldEnd), formatInstant(event.getEndTime())));
+            changes.add(String.format("End time: %s -> %s", formatInstant(oldEnd), formatInstant(event.getEndTime())));
         }
         if (!Objects.equals(oldLocation, event.getLocation())) {
-            changes.add(String.format("Địa điểm: \"%s\" -> \"%s\"", oldLocation != null ? oldLocation : "Không có", event.getLocation() != null ? event.getLocation() : "Không có"));
+            changes.add(String.format("Location: \"%s\" -> \"%s\"", oldLocation != null ? oldLocation : "None", event.getLocation() != null ? event.getLocation() : "None"));
         }
 
         if (!changes.isEmpty()) {
