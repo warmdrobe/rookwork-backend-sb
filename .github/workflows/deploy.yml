@@ -47,9 +47,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          DEPLOY_CMD="aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL='${{ secrets.DB_URL }}' -e DB_USERNAME='${{ secrets.DB_USERNAME }}' -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' -e JWT_SECRET='${{ secrets.JWT_SECRET }}' -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' -e AWS_S3_ACCESS_KEY_ID='${{ secrets.AWS_S3_ACCESS_KEY_ID }}' -e AWS_S3_SECRET_ACCESS_KEY='${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}' -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}' -e APP_EMAIL_FROM='${{ secrets.APP_EMAIL_FROM }}' rookwork-backend:${{ steps.version.outputs.VERSION }}; }"
-
-          jq -n --arg cmd "$DEPLOY_CMD" '{"commands": [$cmd]}' > ssm-params-ec2-1.json
+          jq -n \
+            --arg version "${{ steps.version.outputs.VERSION }}" \
+            --arg s3_bucket "${{ secrets.S3_BUCKET }}" \
+            --arg db_url "${{ secrets.DB_URL }}" \
+            --arg db_user "${{ secrets.DB_USERNAME }}" \
+            --arg db_pass "${{ secrets.DB_PASSWORD }}" \
+            --arg jwt_secret "${{ secrets.JWT_SECRET }}" \
+            --arg google_id "${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --arg aws_key "${{ secrets.AWS_S3_ACCESS_KEY_ID }}" \
+            --arg aws_secret "${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}" \
+            --arg aws_bucket "${{ secrets.AWS_S3_BUCKET }}" \
+            --arg email_from "${{ secrets.APP_EMAIL_FROM }}" \
+            '
+            [
+              if $db_url != "" then "-e DB_URL=" + ($db_url | @sh) else empty end,
+              if $db_user != "" then "-e DB_USERNAME=" + ($db_user | @sh) else empty end,
+              if $db_pass != "" then "-e DB_PASSWORD=" + ($db_pass | @sh) else empty end,
+              if $jwt_secret != "" then "-e JWT_SECRET=" + ($jwt_secret | @sh) else empty end,
+              if $google_id != "" then "-e GOOGLE_CLIENT_ID=" + ($google_id | @sh) else empty end,
+              if $aws_key != "" then "-e AWS_S3_ACCESS_KEY_ID=" + ($aws_key | @sh) else empty end,
+              if $aws_secret != "" then "-e AWS_S3_SECRET_ACCESS_KEY=" + ($aws_secret | @sh) else empty end,
+              if $aws_bucket != "" then "-e AWS_S3_BUCKET=" + ($aws_bucket | @sh) else empty end,
+              if $email_from != "" then "-e APP_EMAIL_FROM=" + ($email_from | @sh) else empty end
+            ] | join(" ") as $env_flags |
+            "aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }" as $cmd |
+            { "commands": [$cmd] }
+            ' > ssm-params-ec2-1.json
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID_1 }}" \
@@ -93,9 +117,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          DEPLOY_CMD="aws s3 cp s3://${{ secrets.S3_BUCKET }}/rookwork-backend-${{ steps.version.outputs.VERSION }}.jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:${{ steps.version.outputs.VERSION }} . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 -e DB_URL='${{ secrets.DB_URL }}' -e DB_USERNAME='${{ secrets.DB_USERNAME }}' -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' -e JWT_SECRET='${{ secrets.JWT_SECRET }}' -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' -e AWS_S3_ACCESS_KEY_ID='${{ secrets.AWS_S3_ACCESS_KEY_ID }}' -e AWS_S3_SECRET_ACCESS_KEY='${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}' -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}' -e APP_EMAIL_FROM='${{ secrets.APP_EMAIL_FROM }}' rookwork-backend:${{ steps.version.outputs.VERSION }}; }"
-
-          jq -n --arg cmd "$DEPLOY_CMD" '{"commands": [$cmd]}' > ssm-params-ec2-2.json
+          jq -n \
+            --arg version "${{ steps.version.outputs.VERSION }}" \
+            --arg s3_bucket "${{ secrets.S3_BUCKET }}" \
+            --arg db_url "${{ secrets.DB_URL }}" \
+            --arg db_user "${{ secrets.DB_USERNAME }}" \
+            --arg db_pass "${{ secrets.DB_PASSWORD }}" \
+            --arg jwt_secret "${{ secrets.JWT_SECRET }}" \
+            --arg google_id "${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --arg aws_key "${{ secrets.AWS_S3_ACCESS_KEY_ID }}" \
+            --arg aws_secret "${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}" \
+            --arg aws_bucket "${{ secrets.AWS_S3_BUCKET }}" \
+            --arg email_from "${{ secrets.APP_EMAIL_FROM }}" \
+            '
+            [
+              if $db_url != "" then "-e DB_URL=" + ($db_url | @sh) else empty end,
+              if $db_user != "" then "-e DB_USERNAME=" + ($db_user | @sh) else empty end,
+              if $db_pass != "" then "-e DB_PASSWORD=" + ($db_pass | @sh) else empty end,
+              if $jwt_secret != "" then "-e JWT_SECRET=" + ($jwt_secret | @sh) else empty end,
+              if $google_id != "" then "-e GOOGLE_CLIENT_ID=" + ($google_id | @sh) else empty end,
+              if $aws_key != "" then "-e AWS_S3_ACCESS_KEY_ID=" + ($aws_key | @sh) else empty end,
+              if $aws_secret != "" then "-e AWS_S3_SECRET_ACCESS_KEY=" + ($aws_secret | @sh) else empty end,
+              if $aws_bucket != "" then "-e AWS_S3_BUCKET=" + ($aws_bucket | @sh) else empty end,
+              if $email_from != "" then "-e APP_EMAIL_FROM=" + ($email_from | @sh) else empty end
+            ] | join(" ") as $env_flags |
+            "aws s3 cp s3://" + $s3_bucket + "/rookwork-backend-" + $version + ".jar /home/ec2-user/rookwork-backend-sb/rookwork-backend.jar --no-progress && cd /home/ec2-user/rookwork-backend-sb && sudo docker build --no-cache -t rookwork-backend:" + $version + " . && { sudo docker rm -f rookwork-backend 2>/dev/null; sudo docker run -d --restart always --name rookwork-backend -p 8080:8080 " + $env_flags + " -e JWT_EXPIRATION=604800000 -e JWT_REFRESH_EXPIRATION=2592000000 -e AWS_REGION=ap-southeast-1 rookwork-backend:" + $version + "; }" as $cmd |
+            { "commands": [$cmd] }
+            ' > ssm-params-ec2-2.json
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID_2 }}" \
