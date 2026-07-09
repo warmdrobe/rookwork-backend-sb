@@ -1,5 +1,19 @@
 package com.example.rookwork_backend_sb.controllers;
 
+import java.io.IOException;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.example.rookwork_backend_sb.dtos.UserSummary;
 import com.example.rookwork_backend_sb.dtos.user.UpdateNotificationsRequest;
 import com.example.rookwork_backend_sb.dtos.user.UpdatePasswordRequest;
@@ -9,22 +23,10 @@ import com.example.rookwork_backend_sb.entities.User;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
 import com.example.rookwork_backend_sb.security.SecurityUtil;
-import com.example.rookwork_backend_sb.services.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.multipart.MultipartFile;
 import com.example.rookwork_backend_sb.services.S3Service;
-import java.io.IOException;
+import com.example.rookwork_backend_sb.services.UserService;
 
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Controller exposing endpoints for user profile operations.
@@ -48,8 +50,8 @@ public class UserController {
   public ResponseEntity<UserSummary> getCurrentUser() {
     UUID userId = securityUtil.getCurrentUserId();
     User user = userRepository.findById(userId)
-
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
     return ResponseEntity.ok(UserSummary.builder()
         .id(user.getId())
         .profileName(user.getProfileName())
@@ -66,6 +68,12 @@ public class UserController {
         .notifyMentioned(user.isNotifyMentioned())
         .notifyProjectUpdates(user.isNotifyProjectUpdates())
         .notifyDailyDigest(user.isNotifyDailyDigest())
+        .systemRole(user.getSystemRole().name())
+        .notifyComment(user.isNotifyComment())
+        .notifyEventInvited(user.isNotifyEventInvited())
+        .hasPassword(user.getPasswordHash() != null)
+        .passwordLimitReached(userService.isPasswordLimitReached(user))
+        .passwordChangesThisMonth(userService.getPasswordChangesThisMonthCalculated(user))
         .build());
   }
 
@@ -103,6 +111,13 @@ public class UserController {
     UUID userId = securityUtil.getCurrentUserId();
     userService.updateNotifications(userId, request);
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/me/password/request-otp")
+  public ResponseEntity<Void> requestPasswordOtp() {
+    UUID userId = securityUtil.getCurrentUserId();
+    userService.requestPasswordOtp(userId);
+    return ResponseEntity.ok().build();
   }
 
   @PutMapping("/me/password")

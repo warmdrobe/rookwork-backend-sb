@@ -3,12 +3,17 @@ package com.example.rookwork_backend_sb.controllers;
 import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
 import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
 import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.dtos.auth.RegisterResponse;
+import com.example.rookwork_backend_sb.dtos.auth.VerifyOtpRequest;
 import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.dtos.auth.RefreshRequest;
 import com.example.rookwork_backend_sb.services.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,15 +50,31 @@ public class AuthController {
     return ResponseEntity.ok(authService.googleLogin(request));
   }
 
+  @GetMapping("/check-email")
+  public ResponseEntity<Boolean> checkEmail(@RequestParam String email) {
+    return ResponseEntity.ok(authService.checkEmail(email));
+  }
+
   /**
-   * Registers a new user account and issues tokens.
+   * Registers a new user account and triggers email OTP verification.
    *
    * @param authRegister the registration details payload
-   * @return response entity containing access and refresh tokens
+   * @return response entity containing confirmation status
    */
   @PostMapping("/register")
-  public ResponseEntity<AuthResponse> register(@RequestBody AuthRegister authRegister) {
+  public ResponseEntity<RegisterResponse> register(@Valid @RequestBody AuthRegister authRegister) {
     return ResponseEntity.ok(authService.register(authRegister));
+  }
+
+  @PostMapping("/verify-otp")
+  public ResponseEntity<AuthResponse> verifyOtp(@RequestBody VerifyOtpRequest request) {
+    return ResponseEntity.ok(authService.verifyOtp(request));
+  }
+
+  @PostMapping("/resend-otp")
+  public ResponseEntity<java.util.Map<String, String>> resendOtp(@RequestParam String email) {
+    authService.resendOtp(email);
+    return ResponseEntity.ok(java.util.Map.of("message", "OTP has been resent to your email."));
   }
 
   /**

@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN otp_failed_attempts INT DEFAULT 0 NOT NULL;

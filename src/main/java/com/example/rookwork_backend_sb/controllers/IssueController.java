@@ -4,6 +4,7 @@ import com.example.rookwork_backend_sb.dtos.issues.CreateIssueRequest;
 import com.example.rookwork_backend_sb.dtos.issues.IssueResponse;
 import com.example.rookwork_backend_sb.dtos.issues.UpdateIssueRequest;
 import com.example.rookwork_backend_sb.services.IssueService;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,7 +33,7 @@ public class IssueController {
     @PostMapping("api/projects/{projectId}/issues")
     public ResponseEntity<IssueResponse> createIssue(
             @PathVariable UUID projectId,
-            @RequestBody CreateIssueRequest request) {
+            @Valid @RequestBody CreateIssueRequest request) {
         return ResponseEntity.ok(issueService.createIssue(projectId, request));
     }
 
@@ -49,7 +50,7 @@ public class IssueController {
     public ResponseEntity<IssueResponse> updateIssue(
             @PathVariable UUID projectId,
             @PathVariable UUID issueId,
-            @RequestBody UpdateIssueRequest request) {
+            @Valid @RequestBody UpdateIssueRequest request) {
         return ResponseEntity.ok(issueService.updateIssue(projectId, issueId, request));
     }
 

@@ -3,13 +3,23 @@ package com.example.rookwork_backend_sb.services;
 import com.example.rookwork_backend_sb.dtos.auth.AuthRegister;
 import com.example.rookwork_backend_sb.dtos.auth.AuthResponse;
 import com.example.rookwork_backend_sb.dtos.auth.LoginRequest;
+import com.example.rookwork_backend_sb.dtos.auth.RegisterResponse;
+import com.example.rookwork_backend_sb.dtos.auth.VerifyOtpRequest;
 import com.example.rookwork_backend_sb.dtos.auth.GoogleLoginRequest;
 import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.entities.Invitation;
+import com.example.rookwork_backend_sb.entities.InvitationStatus;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
+import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
 import com.example.rookwork_backend_sb.exceptions.AppException;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.exceptions.ConflictException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
 import com.example.rookwork_backend_sb.repositories.UserRepository;
+import com.example.rookwork_backend_sb.repositories.InvitationRepository;
+import com.example.rookwork_backend_sb.repositories.ProjectMemberRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +40,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Service class handling user authentication, registration, and token refresh logic.
@@ -42,6 +54,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final InvitationRepository invitationRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final InvitationService invitationService;
+    private final EmailService emailService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${google.client-id:#{null}}")
@@ -56,6 +72,17 @@ public class AuthService {
      * @throws ResourceNotFoundException if user doesn't exist
      */
     public AuthResponse login(LoginRequest dto) {
+        User user = userRepository.findByEmail(dto.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isActive()) {
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                throw new UnauthorizedException("Account has not been activated via OTP");
+            }
+        }
+
         try {
             // Authenticate user credentials via Spring Security
             authenticationManager.authenticate(
@@ -68,10 +95,13 @@ public class AuthService {
             throw new UnauthorizedException("Invalid email or password");
         }
 
-        // Fetch user from repository and generate authentication tokens
-        User user = userRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return generateTokens(user);
+    }
+
+    public boolean checkEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(User::isActive)
+                .orElse(false);
     }
 
     /**
@@ -81,26 +111,186 @@ public class AuthService {
      * @return the authentication response containing tokens for the new user
      * @throws ConflictException if the email is already registered
      */
-    public AuthResponse register(AuthRegister dto) {
-        // Prevent duplicate user registrations with the same email
-        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new ConflictException("Email already in use");
+    private String generateOtp() {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        int code = 100000 + random.nextInt(900000);
+        return String.valueOf(code);
+    }
+
+    public RegisterResponse register(AuthRegister dto) {
+        if (dto.getEmail() == null || !dto.getEmail().matches("^[a-zA-Z0-9._%+-]+@gmail\\.com$")) {
+            throw new BadRequestException("Only @gmail.com emails are accepted");
         }
 
-        // Build and persist the new active user entity with hashed password
-        User user = User.builder()
-                .email(dto.getEmail())
-                .profileName(dto.getProfileName())
-                .passwordHash(passwordEncoder.encode(dto.getPassword()))
-                .isActive(true)
-                .isVerified(false)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+        java.util.Optional<User> existingUserOpt = userRepository.findByEmail(dto.getEmail());
+        User user;
+        String otp = generateOtp();
+        Instant expiry = Instant.now().plus(5, ChronoUnit.MINUTES);
 
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            if (user.isVerified()) {
+                throw new ConflictException("Email already in use");
+            }
+
+            // Prevent password/profile hijacking
+            if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
+                if (user.getOtpExpiry() != null && user.getOtpExpiry().isAfter(Instant.now())) {
+                    throw new ConflictException("A registration is already pending for this email. Please verify the OTP or wait for it to expire.");
+                }
+            }
+
+            // Cooldown check for re-registering (limit to 1 minute between OTP requests)
+            if (user.getOtpExpiry() != null) {
+                Instant lastSent = user.getOtpExpiry().minus(5, ChronoUnit.MINUTES);
+                Instant cooldownEnd = lastSent.plus(1, ChronoUnit.MINUTES);
+                if (Instant.now().isBefore(cooldownEnd)) {
+                    long secondsRemaining = ChronoUnit.SECONDS.between(Instant.now(), cooldownEnd);
+                    throw new BadRequestException("Please wait " + secondsRemaining + " seconds before registering again.");
+                }
+            }
+
+            // Update the placeholder user's registration fields but keep it inactive
+            user.setProfileName(dto.getProfileName());
+            user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+            user.setActive(false);
+            user.setVerified(false);
+            user.setOtpCode(otp);
+            user.setOtpExpiry(expiry);
+            user.setOtpFailedAttempts(0);
+            user.setUpdatedAt(Instant.now());
+            userRepository.save(user);
+        } else {
+            // Build and persist the new inactive user entity with OTP
+            user = User.builder()
+                    .email(dto.getEmail())
+                    .profileName(dto.getProfileName())
+                    .passwordHash(passwordEncoder.encode(dto.getPassword()))
+                    .isActive(false)
+                    .isVerified(false)
+                    .otpCode(otp)
+                    .otpExpiry(expiry)
+                    .otpFailedAttempts(0)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            userRepository.save(user);
+        }
+
+        // Send OTP email
+        emailService.sendOtpEmail(user.getEmail(), otp);
+
+        return new RegisterResponse(user.getEmail(), "An OTP code has been sent to your email. Please verify.");
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public AuthResponse verifyOtp(VerifyOtpRequest dto) {
+        User user = userRepository.findByEmail(dto.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.isVerified()) {
+            throw new ConflictException("User is already verified");
+        }
+
+        if (user.getOtpExpiry() == null || user.getOtpExpiry().isBefore(Instant.now())) {
+            throw new BadRequestException("OTP code has expired");
+        }
+
+        if (user.getOtpCode() == null || !user.getOtpCode().equals(dto.getOtp())) {
+            int attempts = user.getOtpFailedAttempts() + 1;
+            user.setOtpFailedAttempts(attempts);
+            if (attempts >= 5) {
+                user.setOtpCode(null);
+                user.setOtpExpiry(null);
+                user.setOtpFailedAttempts(0);
+                userRepository.save(user);
+                throw new BadRequestException("Too many failed OTP attempts. A new OTP must be requested.");
+            } else {
+                userRepository.save(user);
+                throw new BadRequestException("Invalid OTP code. Remaining attempts: " + (5 - attempts));
+            }
+        }
+
+        // Activate and verify the user
+        user.setActive(true);
+        user.setVerified(true);
+        user.setOtpCode(null);
+        user.setOtpExpiry(null);
+        user.setOtpFailedAttempts(0);
         userRepository.save(user);
 
+        // Auto-join to projects they were invited to
+        if (dto.getInvitationId() != null && !dto.getInvitationId().isEmpty()) {
+            invitationRepository.findById(UUID.fromString(dto.getInvitationId())).ifPresent(invite -> {
+                if (invite.getStatus() == InvitationStatus.PENDING && invite.getInvitedUser().getId().equals(user.getId())) {
+                    invite.setStatus(InvitationStatus.ACCEPTED);
+                    invite.setUpdatedAt(Instant.now());
+                    invitationRepository.save(invite);
+
+                    ProjectMember member = ProjectMember.builder()
+                            .id(new ProjectMemberId(user.getId(), invite.getProject().getId()))
+                            .user(user)
+                            .project(invite.getProject())
+                            .role(ProjectRole.CONTRIBUTOR)
+                            .createdAt(Instant.now())
+                            .updatedAt(Instant.now())
+                            .build();
+                    projectMemberRepository.save(member);
+                    invitationService.notifyProjectMembersNewMember(user, invite.getProject());
+                }
+            });
+        } else {
+            List<Invitation> pendingInvites = invitationRepository.findByInvitedUserIdAndStatus(user.getId(), InvitationStatus.PENDING);
+            for (Invitation invite : pendingInvites) {
+                invite.setStatus(InvitationStatus.ACCEPTED);
+                invite.setUpdatedAt(Instant.now());
+                invitationRepository.save(invite);
+
+                ProjectMember member = ProjectMember.builder()
+                        .id(new ProjectMemberId(user.getId(), invite.getProject().getId()))
+                        .user(user)
+                        .project(invite.getProject())
+                        .role(ProjectRole.CONTRIBUTOR)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                projectMemberRepository.save(member);
+                invitationService.notifyProjectMembersNewMember(user, invite.getProject());
+            }
+        }
+
         return generateTokens(user);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.isVerified()) {
+            throw new ConflictException("User is already verified");
+        }
+
+        // Cooldown check for resending OTP (limit to 1 minute between OTP requests)
+        if (user.getOtpExpiry() != null) {
+            Instant lastSent = user.getOtpExpiry().minus(5, ChronoUnit.MINUTES);
+            Instant cooldownEnd = lastSent.plus(1, ChronoUnit.MINUTES);
+            if (Instant.now().isBefore(cooldownEnd)) {
+                long secondsRemaining = ChronoUnit.SECONDS.between(Instant.now(), cooldownEnd);
+                throw new BadRequestException("Please wait " + secondsRemaining + " seconds before requesting another OTP.");
+            }
+        }
+
+        String otp = generateOtp();
+        Instant expiry = Instant.now().plus(5, ChronoUnit.MINUTES);
+
+        user.setOtpCode(otp);
+        user.setOtpExpiry(expiry);
+        user.setOtpFailedAttempts(0);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 
     /**
@@ -115,6 +305,10 @@ public class AuthService {
         User user = userRepository.findByRefreshTokenHash(
                         hashToken(refreshToken))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
+
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is inactive or suspended");
+        }
 
         // Validate that the refresh token is still within its expiration window
         if (user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
@@ -175,6 +369,16 @@ public class AuthService {
                     .build();
             return userRepository.save(newUser);
         });
+
+        if (!user.isActive()) {
+            if (user.isVerified()) {
+                throw new UnauthorizedException("Account has been suspended/locked by administrator");
+            } else {
+                user.setActive(true);
+                user.setVerified(true);
+                userRepository.save(user);
+            }
+        }
 
         boolean updated = false;
         // Always sync the latest Google avatar URL on each login

@@ -27,17 +27,17 @@ public class Issue {
     @Column(columnDefinition = "text")
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "issue_type", length = 20, nullable = false)
-    private IssueType issueType; // EPIC, STORY, TASK
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_type_id", nullable = false)
+    private IssueType issueType;
 
     @Column(name="priority")
     @Enumerated(EnumType.STRING)
     private PriorityType priority;
 
-    @Column(name="status")
-    @Enumerated(EnumType.STRING)
-    private Status status;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_id", nullable = false)
+    private ProjectStatus status;
     // Self reference (parent issue)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
@@ -64,6 +64,18 @@ public class Issue {
     private List<Issue> children = new ArrayList<>();
 
     private Instant deadline;
+
+    @Column(name = "start_date")
+    private Instant startDate = Instant.now();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "issue_dependencies",
+        joinColumns = @JoinColumn(name = "issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "depends_on_id")
+    )
+    @Builder.Default
+    private List<Issue> dependencies = new ArrayList<>();
 
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();

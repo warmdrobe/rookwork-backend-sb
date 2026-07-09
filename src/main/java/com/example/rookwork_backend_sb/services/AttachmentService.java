@@ -3,8 +3,11 @@ package com.example.rookwork_backend_sb.services;
 import com.example.rookwork_backend_sb.dtos.issues.AttachmentResponse;
 import com.example.rookwork_backend_sb.entities.File;
 import com.example.rookwork_backend_sb.entities.Issue;
+import com.example.rookwork_backend_sb.entities.ProjectMember;
 import com.example.rookwork_backend_sb.entities.ProjectMemberId;
+import com.example.rookwork_backend_sb.entities.ProjectRole;
 import com.example.rookwork_backend_sb.entities.User;
+import com.example.rookwork_backend_sb.exceptions.BadRequestException;
 import com.example.rookwork_backend_sb.exceptions.ForbiddenException;
 import com.example.rookwork_backend_sb.exceptions.ResourceNotFoundException;
 import com.example.rookwork_backend_sb.exceptions.UnauthorizedException;
@@ -52,6 +55,23 @@ public class AttachmentService {
         // Verify issue belongs to the project
         if (!issue.getProject().getId().equals(projectId)) {
             throw new ForbiddenException("Issue does not belong to this project");
+        }
+
+        // Calculate incoming files total size
+        long incomingSize = 0;
+        if (files != null) {
+            for (MultipartFile file : files) {
+                if (file != null && !file.isEmpty()) {
+                    incomingSize += file.getSize();
+                }
+            }
+        }
+
+        // Check if project upload limit (2GB) is exceeded
+        long currentTotalSize = fileRepository.sumSizeBytesByProjectId(projectId);
+        long maxLimit = 2L * 1024 * 1024 * 1024; // 2GB
+        if (currentTotalSize + incomingSize > maxLimit) {
+            throw new BadRequestException("Project upload limit exceeded. Maximum project storage limit is 2GB.");
         }
 
         List<AttachmentResponse> responses = new ArrayList<>();
@@ -106,6 +126,18 @@ public class AttachmentService {
             throw new ForbiddenException("Attachment does not belong to this project");
         }
 
+        // Verify current user is the uploader of the file or the project OWNER
+        ProjectMember currentMember = projectMemberRepository
+                .findById(new ProjectMemberId(currentUserId, projectId))
+                .orElseThrow(() -> new ForbiddenException("Not a member of this project"));
+
+        boolean isOwner = currentMember.getRole() == ProjectRole.OWNER;
+        boolean isUploader = file.getUser() != null && file.getUser().getId().equals(currentUserId);
+
+        if (!isOwner && !isUploader) {
+            throw new ForbiddenException("You are not authorized to delete this attachment");
+        }
+
         // Delete from S3
         s3Service.deleteFile(file.getStoredName());
 
@@ -123,6 +155,35 @@ public class AttachmentService {
             String presignedUrl = s3Service.generatePresignedUrl(file.getStoredName());
             return mapToResponse(file, presignedUrl);
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Moves a file attachment to a different target issue.
+     */
+    @Transactional
+    public AttachmentResponse moveAttachment(UUID projectId, UUID fileId, UUID targetIssueId) {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));
+
+        // Verify source file belongs to the project
+        if (file.getIssue() == null || !file.getIssue().getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Attachment does not belong to this project");
+        }
+
+        Issue targetIssue = issueRepository.findById(targetIssueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target issue not found"));
+
+        // Verify target issue belongs to the project
+        if (!targetIssue.getProject().getId().equals(projectId)) {
+            throw new ForbiddenException("Target issue does not belong to this project");
+        }
+
+        file.setIssue(targetIssue);
+        file.setUpdatedAt(Instant.now());
+        File saved = fileRepository.save(file);
+
+        String presignedUrl = s3Service.generatePresignedUrl(saved.getStoredName());
+        return mapToResponse(saved, presignedUrl);
     }
 
     /**

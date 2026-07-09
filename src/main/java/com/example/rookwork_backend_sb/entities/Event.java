@@ -22,13 +22,13 @@ public class Event {
     @Column(name = "event_name", nullable = false, length = 200)
     private String eventName;
 
-    @Column(name="event_description")
+    @Column(name="event_description", length = 1000)
     private String eventDescription;
 
     @Column(name="deadline")
     private Instant deadline;
 
-    @Column(name="location")
+    @Column(name="location", length = 200)
     private String location;
 
     @Column(name="color")

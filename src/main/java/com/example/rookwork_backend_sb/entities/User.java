@@ -22,10 +22,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name="email", nullable = false)
+    @Column(name="email", nullable = false, unique = true)
     private String email;
 
-    @Column(name="profile_name")
+    @Column(name="profile_name", length = 50)
     private String profileName;
 
     @Column(name="picture")
@@ -52,13 +52,18 @@ public class User {
     @Column(name="updated_at")
     private Instant updatedAt;
 
-    @Column(name="job_title")
+    @Column(name="job_title", length = 100)
     private String jobTitle;
 
-    @Column(name="organization")
+    @Column(name="organization", length = 100)
     private String organization;
 
-    @Column(name="location")
+    @Enumerated(EnumType.STRING)
+    @Column(name="system_role", nullable = false)
+    @Builder.Default
+    private SystemRole systemRole = SystemRole.USER;
+
+    @Column(name="location", length = 150)
     private String location;
 
     @Column(name="email_public")
@@ -92,6 +97,31 @@ public class User {
     @Column(name="notify_daily_digest")
     @Builder.Default
     private boolean notifyDailyDigest = false;
+
+    @Column(name="notify_comment")
+    @Builder.Default
+    private boolean notifyComment = true;
+
+    @Column(name="notify_event_invited")
+    @Builder.Default
+    private boolean notifyEventInvited = true;
+
+    @Column(name = "otp_code", length = 6)
+    private String otpCode;
+
+    @Column(name = "otp_expiry")
+    private java.time.Instant otpExpiry;
+
+    @Column(name = "otp_failed_attempts", nullable = false)
+    @Builder.Default
+    private int otpFailedAttempts = 0;
+
+    @Column(name = "last_password_change_at")
+    private java.time.Instant lastPasswordChangeAt;
+
+    @Column(name = "password_changes_this_month", nullable = false)
+    @Builder.Default
+    private int passwordChangesThisMonth = 0;
 
     @OneToMany(mappedBy = "user")
     private Set<ProjectMember> projectMembers = new HashSet<>();
